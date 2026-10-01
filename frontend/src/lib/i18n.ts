@@ -1,6 +1,17 @@
 import type { Language } from './types';
 
 const en = {
+  origScale: 'Higher is better: 100 means nothing similar was found.',
+  translateHint: 'This analysis is in another language. Translating uses one short AI call and is then kept.',
+  translateNow: 'Translate',
+  translating: 'Translating…',
+  translateFailed: 'Translation failed. Try again.',
+  deleteExperiment: 'Delete',
+  deleteTitle: 'Delete this experiment?',
+  deleteBody: 'The experiment, all its notes, its recordings and its analysis will be removed for everyone. This cannot be undone.',
+  deleteConfirm: 'Delete experiment',
+  deleting: 'Deleting…',
+  deleteFailed: 'Could not delete the experiment.',
   // dictation
   micStart: 'Dictate',
   micStop: 'Stop',
@@ -218,6 +229,17 @@ const en = {
 export type Strings = { [K in keyof typeof en]: string };
 
 const ar: Strings = {
+  origScale: 'كلما ارتفعت النسبة كان أفضل: 100 تعني أنه لم يوجد شيء مشابه.',
+  translateHint: 'هذا التحليل بلغة أخرى. الترجمة تستخدم طلب ذكاء اصطناعي قصير واحد ثم تُحفظ.',
+  translateNow: 'ترجم',
+  translating: 'جارٍ الترجمة…',
+  translateFailed: 'فشلت الترجمة. حاول مرة ثانية.',
+  deleteExperiment: 'حذف',
+  deleteTitle: 'حذف هذه التجربة؟',
+  deleteBody: 'سيتم حذف التجربة وكل ملاحظاتها وتسجيلاتها وتحليلها للجميع. لا يمكن التراجع عن ذلك.',
+  deleteConfirm: 'حذف التجربة',
+  deleting: 'جارٍ الحذف…',
+  deleteFailed: 'تعذّر حذف التجربة.',
   // dictation
   micStart: 'إملاء',
   micStop: 'إيقاف',

@@ -25,7 +25,7 @@
 | POST | `/api/experiments` | `{title,summary?,tags?}` | نعم |
 | GET | `/api/experiments/{id}` | التجربة + النوتس + المتعاونون | نعم |
 | PATCH | `/api/experiments/{id}` | `{status}` (أي عضو) أو `{title,summary,tags}` (المالك) | نعم |
-| DELETE | `/api/experiments/{id}` | المالك فقط | نعم |
+| DELETE | `/api/experiments/{id}` | المالك فقط. يحذف النوتس والتعاون والإشعارات والتسجيل الأصلي وملفات الصوت | نعم |
 | POST | `/api/experiments/{id}/notes` | `{text,kind?}` | نعم |
 | PATCH | `/api/notes/{id}` | `{text?,kind?}` الكاتب أو المالك | نعم |
 | DELETE | `/api/notes/{id}` | الكاتب أو المالك | نعم |
@@ -36,7 +36,8 @@
 | DELETE | `/api/experiments/{id}/collaborators/{userId}` | المالك فقط | نعم |
 | GET | `/api/notifications?unread=&limit=` | `{unread_count, items}` | نعم |
 | POST | `/api/notifications/read` | `{ids?}` بدون ids = الكل | نعم |
-| GET | `/api/experiments/{id}/insights` | حالة ونتيجة مراجعة DeepSeek | نعم |
+| GET | `/api/experiments/{id}/insights?language=ar\|en` | حالة ونتيجة مراجعة DeepSeek. لو اللغة المطلوبة غير لغة التحليل وفي ترجمة محفوظة تُعاد مترجمة، وإلا `needs_translation: true` | نعم |
+| POST | `/api/experiments/{id}/insights/translate?language=` | ترجمة التحليل مرة وحدة (طلب قصير) وتُحفظ، وتبديل اللغة بعدها مجاني | نعم |
 | POST | `/api/experiments/{id}/insights` | تشغيل المراجعة (202). `503` لو ما في مفتاح | نعم |
 | **POST** | **`/api/sessions`** | **المدخل: `session.json` (+ الصوت) من برنامج اللابتوب** | token أو cookie |
 | GET | `/api/sessions`, `/api/sessions/{sessionId}` | الجلسات المرفوعة والـ JSON الأصلي بدون أي تغيير | نعم |

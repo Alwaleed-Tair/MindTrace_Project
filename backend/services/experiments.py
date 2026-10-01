@@ -176,9 +176,16 @@ def update_experiment(db: Database, exp_id: int, user_id: int, patch: dict) -> d
     return serialize(db, db.one("SELECT * FROM experiments WHERE id=?", (exp_id,)), user_id)
 
 
-def delete_experiment(db: Database, exp_id: int, user_id: int) -> None:
+def delete_experiment(db: Database, exp_id: int, user_id: int, audio_root=None) -> None:
+    """Owner only. Notes, collaborators and notifications go with it (cascade), and so do the recordings it came from."""
     require(db, exp_id, user_id, owner_only=True)
+    rec = db.all("SELECT owner_id, session_id FROM sessions WHERE experiment_id=?", (exp_id,))
+    db.run("DELETE FROM sessions WHERE experiment_id=?", (exp_id,))
     db.run("DELETE FROM experiments WHERE id=?", (exp_id,))
+    if audio_root is not None:
+        from services import storage
+        for r in rec:
+            storage.delete_session_audio(audio_root, r["owner_id"], r["session_id"])
 
 
 def touch(db: Database, exp_id: int) -> None:

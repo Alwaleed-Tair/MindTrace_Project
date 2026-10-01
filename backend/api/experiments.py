@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from api.deps import current_user, db, settings
 from services import experiments as ex
+from services import ai as ai_service
 from services import insights as insights_service
 from services import storage
 from services import users as users_service
@@ -82,7 +83,7 @@ def patch_experiment(exp_id: str, body: ExperimentPatch, request: Request, user=
 
 @router.delete("/experiments/{exp_id}", status_code=204)
 def delete_experiment(exp_id: str, request: Request, user=Depends(current_user)):
-    ex.delete_experiment(db(request), _id(exp_id), user["id"])
+    ex.delete_experiment(db(request), _id(exp_id), user["id"], settings(request).audio_dir)
 
 
 # ------------------------------------------------------------------ notes
@@ -135,10 +136,10 @@ def remove_collaborator(exp_id: str, public_id: str, request: Request, user=Depe
 
 # ---------------------------------------------------------------- insights
 @router.get("/experiments/{exp_id}/insights")
-def get_insights(exp_id: str, request: Request, user=Depends(current_user)):
+def get_insights(exp_id: str, request: Request, language: str | None = None, user=Depends(current_user)):
     d, eid = db(request), _id(exp_id)
     ex.require(d, eid, user["id"])
-    return {**insights_service.get(d, eid), "ai_configured": settings(request).ai_configured}
+    return {**insights_service.get(d, eid, language), "ai_configured": settings(request).ai_configured}
 
 
 @router.post("/experiments/{exp_id}/insights", status_code=202)
@@ -150,3 +151,19 @@ def refresh_insights(exp_id: str, background: BackgroundTasks, request: Request,
     insights_service.set_state(d, eid, "queued")
     background.add_task(insights_service.run, d, st, eid, request.app.state.ai_client, language if language in ("ar", "en") else None)
     return {"status": "queued"}
+
+
+@router.post("/experiments/{exp_id}/insights/translate")
+def translate_insights(exp_id: str, request: Request, language: str, user=Depends(current_user)):
+    """Translate the texts of the existing analysis (one short call, then kept: switching language again costs nothing)."""
+    d, st, eid = db(request), settings(request), _id(exp_id)
+    ex.require(d, eid, user["id"])
+    if language not in ("ar", "en"):
+        raise HTTPException(422, "language must be ar or en")
+    if not st.ai_configured:
+        raise HTTPException(503, "DEEPSEEK_API_KEY is not set on the server")
+    try:
+        insights_service.translate(d, st, eid, language, request.app.state.ai_client)
+    except ai_service.AiError as exc:
+        raise HTTPException(502, str(exc))
+    return {**insights_service.get(d, eid, language), "ai_configured": True}

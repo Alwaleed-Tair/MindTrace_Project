@@ -1,8 +1,9 @@
-import { Beaker, CheckCircle2, Clock3, PauseCircle, UserPlus } from 'lucide-react';
+import { Beaker, CheckCircle2, Clock3, PauseCircle, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { Avatar } from '@/components/common/Avatar';
 import { StatusPill } from '@/components/common/StatusPill';
+import { DeleteExperimentDialog } from '@/components/dashboard/DeleteExperimentDialog';
 import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
 import { StatusActions } from '@/components/dashboard/StatusActions';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -25,6 +26,7 @@ const stateClass: Record<Status, string> = {
 export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experiment; onSetStatus: (id: string, status: Status) => void }) {
   const { t, language } = usePreferences();
   const [peopleOpen, setPeopleOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const e = experiment;
   const people = [e.owner, ...e.collaborators];
 
@@ -61,8 +63,14 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
           <UserPlus size={13} />
           {t.addPeople}
         </button>
+        {e.role === 'owner' && (
+          <button type="button" onClick={() => setDeleteOpen(true)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition hover:border-destructive/50 hover:text-destructive" aria-label={t.deleteExperiment} title={t.deleteExperiment} data-testid={`button-delete-${e.id}`}>
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
       {peopleOpen && <AddPeopleDialog experiment={e} open={peopleOpen} onOpenChange={setPeopleOpen} />}
+      {deleteOpen && <DeleteExperimentDialog experiment={e} open={deleteOpen} onOpenChange={setDeleteOpen} />}
     </article>
   );
 }

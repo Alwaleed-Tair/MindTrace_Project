@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { CreateExperimentDialog } from '@/components/dashboard/CreateExperimentDialog';
 import { ExperimentCard } from '@/components/dashboard/ExperimentCard';
-import { InsightsMetricCard, MetricCard } from '@/components/dashboard/MetricCards';
+import { MetricCard } from '@/components/dashboard/MetricCards';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useCreateExperiment, useExperiments, useSetStatus, useStats } from '@/hooks/queries';
@@ -43,11 +43,10 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="metrics">
+      <div className="mt-9 grid gap-4 sm:grid-cols-2" data-testid="metrics">
         <MetricCard testId="metric-active" icon={FlaskConical} label={t.activeThreads} value={String(stats.data?.active_threads ?? 0).padStart(2, '0')} note={t.inMotion} delay={1} />
         {/* no subtext under this one, on purpose */}
         <MetricCard testId="metric-originality" icon={Lightbulb} label={t.avgOriginality} value={`${stats.data?.avg_originality ?? 0}%`} delay={3} />
-        <InsightsMetricCard stats={stats.data} />
       </div>
 
       <section className="mt-10 animate-in delay-3">
