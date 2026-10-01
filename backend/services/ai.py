@@ -71,6 +71,10 @@ class AiError(Exception):
     pass
 
 
+class AiOutputError(AiError):
+    """The model answered, but not with the JSON we asked for. Worth asking again (it is occasionally malformed)."""
+
+
 SYSTEM_PROMPT = """You review lab-experiment voice notes for a research documentation platform.
 The input is JSON: the experiment title and the transcribed notes, in order. The transcripts come from automatic
 speech recognition of a researcher speaking Gulf Arabic mixed with English technical terms, so some words are wrong
@@ -97,7 +101,9 @@ Return ONLY one JSON object, no other text, with exactly these keys:
    (a label for every note: observation = something seen or measured, hypothesis = a guess or explanation to test,
     decision = a choice about what to do next)
 }
-Write summary, strengths, gaps, rationale and caveat in __LANG__. Never invent measurements that are not in the notes."""
+Write summary, strengths, gaps, rationale and caveat in __LANG__. Never invent measurements that are not in the notes.
+Keep it short (summary 3-5 sentences, at most 4 strengths and 4 gaps). Check that every { and [ is closed. The exact shape:
+{"summary": "...", "documentation_quality": {"score": 0, "strengths": ["..."], "gaps": ["..."]}, "novelty": {"score": 0, "rationale": "...", "caveat": "..."}, "note_suggestions": [], "notes_to_review": [], "note_kinds": [{"note_id": 1, "kind": "observation"}]}"""
 
 
 def build_messages(session: dict, language: str) -> list[dict]:
@@ -137,13 +143,13 @@ def parse_result(content: str, valid_note_ids: set[int]) -> dict:
     try:
         data = json.loads(_FENCE.sub("", content or ""))
     except json.JSONDecodeError as exc:
-        raise AiError(f"the model did not return valid JSON ({exc.msg})") from exc
+        raise AiOutputError(f"the model did not return valid JSON ({exc.msg})") from exc
     if not isinstance(data, dict):
-        raise AiError("the model did not return a JSON object")
+        raise AiOutputError("the model did not return a JSON object")
     try:
         res = AiResult.model_validate(data)
     except ValidationError as exc:
-        raise AiError("the model's JSON did not match the expected shape: " + "; ".join(
+        raise AiOutputError("the model's JSON did not match the expected shape: " + "; ".join(
             f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()[:4])) from exc
     # suggestions only for notes that exist; ids that do not exist are dropped
     res.note_suggestions = [s for s in res.note_suggestions if s.note_id in valid_note_ids and s.suggested_text.strip()]
@@ -158,26 +164,35 @@ def analyze(settings: Settings, session: dict, client: httpx.Client | None = Non
         raise AiError("DEEPSEEK_API_KEY is not set")
     ids = {n["id"] for n in session.get("notes", []) if isinstance(n.get("id"), int)}
     body = {"model": settings.deepseek_model, "messages": build_messages(session, settings.ai_language),
-            "temperature": 0.2, "response_format": {"type": "json_object"}, "max_tokens": 2000}
+            "temperature": 0.1, "response_format": {"type": "json_object"}, "max_tokens": 2000}
     headers = {"Authorization": f"Bearer {settings.deepseek_api_key}", "Content-Type": "application/json"}
     url = settings.deepseek_base_url.rstrip("/") + "/chat/completions"
     own = client is None
     client = client or httpx.Client(timeout=settings.ai_timeout_sec)
     last = ""
     try:
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 r = client.post(url, headers=headers, json=body)
             except httpx.HTTPError as exc:
                 last = f"network error: {exc.__class__.__name__}"
+                if attempt >= 1:
+                    break                                           # the network gets one retry
             else:
                 if r.status_code == 200:
                     try:
                         content = r.json()["choices"][0]["message"]["content"]
                     except (KeyError, IndexError, ValueError, TypeError) as exc:
                         raise AiError("unexpected response format from DeepSeek") from exc
-                    result = parse_result(content, ids)
-                    result["meta"] = {"model": settings.deepseek_model, "provider": "deepseek",
+                    try:
+                        result = parse_result(content, ids)
+                    except AiOutputError as exc:                  # malformed JSON happens now and then: ask again (up to 3 tries)
+                        last = str(exc)
+                        if attempt < 2:
+                            time.sleep(0.5)
+                            continue
+                        raise
+                    result["meta"] = {"model": settings.deepseek_model, "provider": "deepseek", "attempts": attempt + 1,
                                       "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
                     return result
                 if r.status_code in (401, 403):
@@ -185,8 +200,9 @@ def analyze(settings: Settings, session: dict, client: httpx.Client | None = Non
                 last = f"DeepSeek HTTP {r.status_code}"
                 if r.status_code < 500 and r.status_code != 429:
                     raise AiError(last)
-            if attempt == 0:
-                time.sleep(1.5)
+                if attempt >= 1:
+                    break
+            time.sleep(1.5)
         raise AiError(last or "DeepSeek request failed")
     finally:
         if own:

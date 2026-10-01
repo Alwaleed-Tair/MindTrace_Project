@@ -17,6 +17,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from core.config import Settings
+from core.env import load_env
 from core.db import Database
 from schemas.session import SessionIn
 from services import experiments as ex
@@ -24,6 +25,7 @@ from services import sessions as sessions_service
 from services import users as users_service
 
 HERE = Path(__file__).resolve().parent
+load_env()
 DEFAULT_DEMO_PASSWORD = "MindTrace-Demo-2026"
 
 

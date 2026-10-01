@@ -103,3 +103,9 @@ def test_manage_cli_creates_a_token_that_works(tmp_path, monkeypatch, capsys):
     app = create_app(Settings())
     assert TestClient(app).get("/api/experiments", headers={"Authorization": f"Bearer {token}"}).status_code == 200
     assert manage.main(["create-token", "nobody@x.com"]) == 1
+
+
+def test_what_was_uploaded_is_remembered_per_server_and_account():
+    a = br.state_key("http://one:8000", "mt_aaa")
+    assert a == br.state_key("http://one:8000/", "mt_aaa")
+    assert a != br.state_key("http://two:8000", "mt_aaa") and a != br.state_key("http://one:8000", "mt_bbb")

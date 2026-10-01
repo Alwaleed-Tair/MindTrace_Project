@@ -7,8 +7,12 @@ import getpass
 import sys
 
 from core.config import Settings
+from core.env import load_env
 from core.db import Database
 from services import users
+
+
+load_env()
 
 
 def main(argv=None) -> int:

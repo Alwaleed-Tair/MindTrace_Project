@@ -57,6 +57,11 @@ def save_state(state: dict, path: Path = STATE_FILE) -> None:
     tmp.replace(path)
 
 
+def state_key(url: str, token: str) -> str:
+    """What was uploaded is remembered per platform AND account: a different server, account or a wiped database starts fresh."""
+    return hashlib.sha256(f"{url.rstrip('/')}|{token}".encode("utf-8")).hexdigest()[:16]
+
+
 def find_sessions(sessions_dir: Path) -> list[Path]:
     """Folders with a readable session.json whose status is 'complete' (a session still recording or being
     transcribed is skipped until it finishes)."""
@@ -137,7 +142,8 @@ def main(argv=None) -> int:
         print(f"Sessions folder not found: {sessions_dir}  (use --sessions-dir)", file=sys.stderr)
         return 2
     with_full = cfg("UPLOAD_FULL_RECORDING", True) and not a.no_full_audio
-    state = load_state()
+    all_state = load_state()
+    state = all_state.setdefault(state_key(a.url, token), {})
     with httpx.Client() as client:
         try:
             h = client.get(a.url.rstrip("/") + "/api/health", timeout=10).json()
@@ -153,7 +159,7 @@ def main(argv=None) -> int:
         while True:
             sent, failed = run_once(client, a.url, sessions_dir, state, with_full, token, a.dry_run)
             if sent:
-                save_state(state)
+                save_state(all_state)
             if not a.watch:
                 if not (sent or failed):
                     print("Nothing new to upload.")

@@ -92,6 +92,21 @@ def test_bad_model_output_is_a_clean_failure_not_a_crash(tmp_path, content):
     assert ins["status"] == "failed" and ins["error"] and ins["result"] is None
 
 
+def test_malformed_json_is_asked_again_and_the_second_answer_is_used(tmp_path):
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        # the real failure seen from DeepSeek: a closing brace missing after "gaps"
+        broken = json.dumps(good(), ensure_ascii=False).replace('"gaps": ["ما ذكر الهدف"]}', '"gaps": ["ما ذكر الهدف"]')
+        assert broken != json.dumps(good(), ensure_ascii=False)          # the fixture really is malformed
+        return reply(broken if len(calls) == 1 else good())
+    app, u = setup(tmp_path, handler)
+    r = post(app, token(u))
+    ins = u.get(f"/api/experiments/{r.json()['experiment_id']}/insights").json()
+    assert len(calls) == 2 and ins["status"] == "done" and ins["result"]["meta"]["attempts"] == 2
+
+
 def test_code_fences_are_tolerated(tmp_path):
     app, u = setup(tmp_path, lambda req: reply("```json\n" + json.dumps(good()) + "\n```"))
     r = post(app, token(u))

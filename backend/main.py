@@ -18,11 +18,13 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from api import auth, experiments, misc, sessions
 from core.config import Settings
+from core.env import load_env
 from core.db import Database
 from services import experiments as ex
 from services import users as users_service
 
 API_VERSION = "2.0.0"
+load_env()                      # DEEPSEEK_API_KEY etc. from backend/.env or the repository .env (never committed)
 
 
 def create_app(settings: Settings | None = None, ai_client: httpx.Client | None = None) -> FastAPI:

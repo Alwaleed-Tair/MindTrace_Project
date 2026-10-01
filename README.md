@@ -1,60 +1,79 @@
 # MindTrace Project (المنصة)
 
-الباحث يتكلم قدام الجهاز، برنامج اللابتوب يحوّل الكلام نوتس مكتوبة، **والمنصة تستقبل الـ `session.json` (مع الصوت) كمدخل**، تخزّنه، وتطلب من DeepSeek ملخص وتقييم توثيق واقتراحات تصحيح.
+الباحث يتكلم قدام الجهاز، برنامج اللابتوب يحوّل الكلام نوتس مكتوبة، **والمنصة تستقبل الـ `session.json` (مع الصوت) كمدخل** وتحوّله تجربة بنوتس، مع حسابات وتعاون وإشعارات ومراجعة من DeepSeek.
 
 ```
-الجهاز ESP32 → برنامج اللابتوب (مستودع MindTrace) → bridge → backend → frontend (عمر)
+الجهاز ESP32 → برنامج اللابتوب (مستودع MindTrace) → bridge → backend (FastAPI + SQLite) ⇄ frontend (React)
 ```
 
-| المجلد | وش فيه | الحالة |
-|---|---|---|
-| `backend/` | خادم FastAPI + SQLite، يستقبل الجلسات ويطلب مراجعة DeepSeek | جاهز، 39 اختبار |
-| `bridge/` | يرفع مجلد `sessions/` من اللابتوب للخادم | جاهز |
-| `backend/mock_backend.py` | خادم وهمي للواجهة (بدون تثبيت ولا مفاتيح) | جاهز |
-| `docs/API_CONTRACT.md` | **العقد**: المسارات وشكل `session.json` | جاهز |
-| `frontend/` | الواجهة | عمر |
-| `firmware/` | الفيرموير في مستودع `MindTrace` | — |
+| المجلد | وش فيه |
+|---|---|
+| `frontend/` | الواجهة (React + Vite + Tailwind)، مقسّمة لمكونات، متصلة بالـ API |
+| `backend/` | الخادم: حسابات، تجارب، نوتس، تعاون، إشعارات، DeepSeek، استقبال `session.json`، seed |
+| `bridge/` | يرفع مجلد جلسات اللابتوب للمنصة |
+| `e2e/` | اختبارات متصفح حقيقي (Playwright) على الخادم الحقيقي |
+| `docs/` | `API_CONTRACT.md` (كل الـ endpoints) و`architecture.md` |
 
-## تشغيل الخادم (محلي)
-```
+## المتطلبات
+Git، **Python 3.11+**، **Node.js 20+** (من nodejs.org، يشمل npm). لا يحتاج PostgreSQL: القاعدة SQLite وتنشأ لحالها.
+
+## التشغيل من الصفر (Windows PowerShell)
+```powershell
+git clone https://github.com/Alwaleed-Tair/MindTrace_Project
+cd MindTrace_Project
+git checkout claude/platform-link        # لين ندمج الفرع في main
+
+# 1) الخادم
 cd backend
 pip install -r requirements.txt
+copy ..\.env.example .env                # افتح الملف وحط DEEPSEEK_API_KEY (اختياري)
+python seed.py                           # بيانات تجريبية من ملفات JSON
+
+# 2) الواجهة (مرة وحدة، تبني frontend/dist)
+cd ..\frontend
+npm install
+npm run build
+
+# 3) شغّل
+cd ..\backend
 uvicorn main:app --port 8000
 ```
-الإعدادات متغيرات بيئة (القائمة في `.env.example`). بدون مفتاح DeepSeek كل شي يشتغل ما عدا المراجعة (`ai.status = disabled`).
+افتح **http://localhost:8000** ← اضغط **Open demo workspace**، أو سجّل بـ `demo@mindtrace.app` وكلمة المرور `MindTrace-Demo-2026` (للتجربة المحلية فقط)، أو أنشئ حسابك.
 
-مثال PowerShell مع المفاتيح (المفتاح يكون عندك بالبيئة، لا تكتبه في ملف ولا تلصقه في شات):
-```
-$env:DEEPSEEK_API_KEY = "..."
-$env:MINDTRACE_API_KEY = "اختر-كلمة-سر"
-uvicorn main:app --port 8000
-```
+**وضع التطوير** (تعديل الواجهة مباشرة): نافذة `uvicorn main:app --port 8000 --reload` ونافذة `cd frontend; npm run dev` ثم **http://localhost:3000** (يمرّر `/api` للخادم).
 
-أو Docker: `docker compose up --build` (غير مجرَّب هنا).
-
-## رفع الجلسات من اللابتوب
+## DeepSeek
+المفتاح في `backend/.env` فقط (الملف في `.gitignore`)، ويُستدعى من الخادم، **ما يوصل المتصفح**:
 ```
+DEEPSEEK_API_KEY=مفتاحك
+```
+بدونه كل شي يشتغل والرؤى تكتب "AI insights are off". الاستخدام: تجربة ← تبويب **Insights** ← **Refresh insights**. الجلسات المسجّلة تُحلَّل تلقائياً أول ما توصل. النموذج يستلم نص النوتس فقط.
+
+## ربط برنامج اللابتوب
+1. من الواجهة: **Settings ← Laptop bridge token ← Create a token** وانسخه (يظهر مرة وحدة).
+2. على اللابتوب:
+```powershell
 cd bridge
 pip install -r requirements.txt
-python mindtrace_bridge.py --sessions-dir ..\..\MindTrace\MindTrace2\sessions   # يرفع الجديد ويطلع
-python mindtrace_bridge.py --watch --sessions-dir ...                           # يظل شغال ويرفع كل جلسة تنتهي
+$env:MINDTRACE_API_TOKEN = "mt_..."
+python mindtrace_bridge.py --sessions-dir ..\..\MindTrace\MindTrace2\sessions
+python mindtrace_bridge.py --watch --sessions-dir ...    # يظل شغال ويرفع كل جلسة تنتهي
 ```
-- يرفع **كل جلسة مكتملة مرة وحدة**، وبعدين لو تغيّر `session.json` (مثلاً بعد `--retranscribe`).
-- إذا الخادم عليه مفتاح (`MINDTRACE_API_KEY`) حط نفس القيمة في بيئة اللابتوب.
-- ما يعدّل ولا يحذف شي من مجلد الجلسات.
-
-## للواجهة (عمر)
-اقرأ `docs/API_CONTRACT.md`، وشغّل `python backend/mock_backend.py` وابني عليه. الأشكال نفسها في الخادم الحقيقي (فيه اختبار يتأكد من التطابق).
+كل جلسة مكتملة تصير **تجربة جديدة** بنوتسها (مع الصوت وقراءة Whisper الثانية للنوتس المشكوك فيها). تُرفع مرة وحدة، وبعدين لو تغيّر `session.json` (بعد `--retranscribe`) تتحدّث نفس التجربة. تقدر تنشئ token بدون واجهة: `python backend/manage.py create-token you@lab.com`.
 
 ## الاختبارات
+```powershell
+cd backend; python -m pytest -q                                   # الخادم + الجسر
+cd frontend; npm test                                              # مكونات الواجهة
+pip install -r e2e/requirements.txt; python -m playwright install chromium
+python -m pytest -q e2e                                            # متصفح حقيقي (يحتاج npm run build أول)
+# مع DeepSeek الحقيقي:  $env:DEEPSEEK_API_KEY="..."; python -m pytest -q e2e
 ```
-cd backend
-python -m pytest -q
-```
-تغطي: الاستقبال (JSON وmultipart مع صوت)، رفض الأسماء الخطرة، المفتاح، حد الحجم، التحديث عند إعادة الإرسال، مراجعة DeepSeek (بخادم وهمي)، والجسر.
 
-## ما اختُبر وما لا
-- **اختُبر:** المسار الكامل بجلسة حقيقية من برنامج اللابتوب (مع الجهاز المحاكي) ← الجسر ← خادم uvicorn شغّال ← قراءة النتيجة والصوت.
-- **ما اختُبر:** DeepSeek الحقيقي (ما عندي مفتاح ولا وصول). اختُبر بخادم وهمي بنفس شكل الرد. أول مرة تحط المفتاح، شوف `ai.status` و`ai.error` بعد رفع جلسة. جودة الملخص والتقييم تحتاج مراجعتك.
-- **ما اختُبر:** Docker.
-- **الأمان:** النموذج يستلم نص النوتس بس (بدون صوت ولا مسارات)، والنص يُعامل كبيانات مو تعليمات، ولا يعدّل النص الأصلي أبداً. هذا تقليل مخاطر، مو ضمان ضد كل محاولات حقن الأوامر.
+## Docker (غير مجرَّب)
+`docker compose up --build` ثم `docker compose run --rm app python seed.py` ← **http://localhost:8000**. ما اختُبر هنا لأن البيئة بدون Docker.
+
+## ملاحظات
+- الصوت الأصلي دايماً محفوظ، و`needs_review` وقراءة Whisper الثانية **تلميحات** مو دليل.
+- زر **Record observation** في صفحة التجربة عرض تجريبي من تصميم الواجهة الأصلي (ما يسجّل). التسجيل الحقيقي من الجهاز.
+- التفاصيل: `docs/API_CONTRACT.md` و`docs/architecture.md`.
