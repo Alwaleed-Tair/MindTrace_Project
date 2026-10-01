@@ -491,7 +491,7 @@ describe('voice note (dictation)', () => {
   }
   const say = (text: string, isFinal = true) => FakeRecognition.last!.onresult!({ resultIndex: 0, results: [{ isFinal, 0: { transcript: text } }] });
 
-  it('the header button starts dictation into the note box; the text can be edited and saved', async () => {
+  it('the header button dictates into the note box and Stop saves it as a note', async () => {
     (window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeRecognition;
     signedIn();
     A.getExperiment.mockResolvedValue(exp());
@@ -506,7 +506,6 @@ describe('voice note (dictation)', () => {
     expect(screen.getByTestId('textarea-new-note')).toHaveValue('we measured twenty five degrees and it was stable');
     await userEvent.click(screen.getByTestId('button-toggle-recording'));
     await waitFor(() => expect(screen.queryByTestId('status-recording')).toBeNull());
-    await userEvent.click(screen.getByTestId('button-save-note'));
     await waitFor(() => expect(A.addNote).toHaveBeenCalledWith('1', 'we measured twenty five degrees and it was stable'));
     delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
   });

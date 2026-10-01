@@ -1,5 +1,5 @@
 import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Sparkles, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { StatusPill } from '@/components/common/StatusPill';
 import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
@@ -10,7 +10,7 @@ import { InsightsTab, OriginalityCard, useInsightsLanguageSync } from '@/compone
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useExperiment, useSetStatus } from '@/hooks/queries';
+import { useAddNote, useExperiment, useSetStatus } from '@/hooks/queries';
 import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
@@ -39,6 +39,14 @@ function Detail({ experiment }: { experiment: Experiment }) {
   const [draft, setDraft] = useState('');
   const dictation = useDictation(language === 'ar' ? 'ar-SA' : 'en-US', (text) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text)));
   const recording = dictation.listening;
+  const addNote = useAddNote(experiment.id);
+  const wasListening = useRef(false);
+  // pressing stop saves what was said as a note (it can still be edited afterwards from the timeline)
+  useEffect(() => {
+    if (wasListening.current && !recording && draft.trim()) addNote.mutate(draft.trim(), { onSuccess: () => setDraft('') });
+    wasListening.current = recording;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording]);
   const toggleVoice = () => {
     if (!recording) {
       setTab('overview');

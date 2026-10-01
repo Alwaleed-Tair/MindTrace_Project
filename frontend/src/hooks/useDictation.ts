@@ -26,15 +26,20 @@ export function useDictation(lang: string, onText: (text: string) => void) {
   const [interim, setInterim] = useState('');
   const [error, setError] = useState<DictationError>(null);
   const rec = useRef<Recognition | null>(null);
+  const want = useRef(false);                       // true until the user presses stop: Chrome ends a session after a silence, so it is restarted
   const cb = useRef(onText);
   cb.current = onText;
   const supported = typeof window !== 'undefined' && !!getCtor();
 
-  const stop = useCallback(() => rec.current?.stop(), []);
+  const stop = useCallback(() => {
+    want.current = false;
+    rec.current?.stop();
+  }, []);
   const start = useCallback(() => {
     const Ctor = getCtor();
     if (!Ctor || rec.current) return;
     setError(null);
+    want.current = true;
     const r = new Ctor();
     r.lang = lang;
     r.continuous = true;
@@ -51,13 +56,25 @@ export function useDictation(lang: string, onText: (text: string) => void) {
       setInterim(live);
     };
     r.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') setError('denied');
-      else if (e.error !== 'no-speech' && e.error !== 'aborted') setError('failed');
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setError('denied'); want.current = false; }
+      else if (e.error !== 'no-speech' && e.error !== 'aborted') { setError('failed'); want.current = false; }
     };
     r.onend = () => {
       rec.current = null;
-      setListening(false);
       setInterim('');
+      if (want.current) {                            // ended by itself (silence): keep listening
+        try {
+          const again = new Ctor();
+          Object.assign(again, { lang: r.lang, continuous: true, interimResults: true, onresult: r.onresult, onerror: r.onerror, onend: r.onend });
+          rec.current = again;
+          again.start();
+          return;
+        } catch {
+          rec.current = null;
+          want.current = false;
+        }
+      }
+      setListening(false);
     };
     rec.current = r;
     setListening(true);
@@ -70,7 +87,7 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     }
   }, [lang]);
 
-  useEffect(() => () => rec.current?.stop(), []);
+  useEffect(() => () => { want.current = false; rec.current?.stop(); }, []);
   return { supported, listening, interim, error, start, stop, toggle: () => (rec.current ? stop() : start()) };
 }
 
