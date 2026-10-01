@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "session_id": "demo-2026-10-01_16-09-29",
+  "status": "complete",
+  "stop_reason": "button",
+  "title": "اليوم بدأنا التجربة الساعة 9 صباحا.",
+  "started_at": "2026-10-01T16:09:29+03:00",
+  "ended_at": "2026-10-01T16:16:34+03:00",
+  "duration_sec": 425.54,
+  "note_count": 7,
+  "notes": [
+    {
+      "id": 0,
+      "kind": "title",
+      "start_sec": 4.12,
+      "end_sec": 6.94,
+      "duration_sec": 2.82,
+      "time_label": "00:04",
+      "audio_file": "notes/title.wav",
+      "text": "اليوم بدأنا التجربة الساعة 9 صباحا.",
+      "word_count": 6,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "reference",
+        "similarity": null,
+        "min_similarity": null,
+        "low_window_share": null,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": false
+      },
+      "asr": {
+        "language": "Arabic",
+        "confidence": 0.94,
+        "needs_review": false,
+        "language_rechecked": false,
+        "alternative": null
+      }
+    },
+    {
+      "id": 1,
+      "kind": "note",
+      "start_sec": 10.77,
+      "end_sec": 13.75,
+      "duration_sec": 2.98,
+      "time_label": "00:10",
+      "audio_file": "notes/note_01.wav",
+      "text": "حطيت العينة في الثلاجة عشان تبرد.",
+      "word_count": 6,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "reference",
+        "similarity": null,
+        "min_similarity": null,
+        "low_window_share": null,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": false
+      },
+      "asr": {
+        "language": "Arabic",
+        "confidence": 0.97,
+        "needs_review": false,
+        "language_rechecked": false,
+        "alternative": null
+      }
+    },
+    {
+      "id": 2,
+      "kind": "note",
+      "start_sec": 17.3,
+      "end_sec": 20.86,
+      "duration_sec": 3.56,
+      "time_label": "00:17",
+      "audio_file": "notes/note_02.wav",
+      "text": "The temperature is stable at 25 degrees.",
+      "word_count": 7,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "match",
+        "similarity": 0.727,
+        "min_similarity": 0.727,
+        "low_window_share": 0.0,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": false
+      },
+      "asr": {
+        "language": "English",
+        "confidence": 0.98,
+        "needs_review": false,
+        "language_rechecked": false,
+        "alternative": null
+      }
+    },
+    {
+      "id": 3,
+      "kind": "note",
+      "start_sec": 25.08,
+      "end_sec": 27.64,
+      "duration_sec": 2.56,
+      "time_label": "00:25",
+      "audio_file": "notes/note_03.wav",
+      "text": "قاسنة تيم بريتشر بعد الظهر.",
+      "word_count": 5,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "match",
+        "similarity": 0.651,
+        "min_similarity": 0.651,
+        "low_window_share": 0.0,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": true
+      },
+      "asr": {
+        "language": "Arabic",
+        "confidence": 0.63,
+        "needs_review": true,
+        "language_rechecked": false,
+        "alternative": {
+          "engine": "faster-whisper",
+          "model": "turbo",
+          "text": "جسنا التمبريتشر بعد الظهر"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "kind": "note",
+      "start_sec": 32.34,
+      "end_sec": 34.33,
+      "duration_sec": 1.99,
+      "time_label": "00:32",
+      "audio_file": "notes/note_04.wav",
+      "text": "السام بالجهاز للفحص.",
+      "word_count": 3,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "match",
+        "similarity": 0.781,
+        "min_similarity": 0.781,
+        "low_window_share": 0.0,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": true
+      },
+      "asr": {
+        "language": "Arabic",
+        "confidence": 0.75,
+        "needs_review": true,
+        "language_rechecked": false,
+        "alternative": {
+          "engine": "faster-whisper",
+          "model": "turbo",
+          "text": "السامبل جاهز للفحص"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "kind": "note",
+      "start_sec": 44.21,
+      "end_sec": 46.68,
+      "duration_sec": 2.47,
+      "time_label": "00:44",
+      "audio_file": "notes/note_05.wav",
+      "text": "Please save the data before you leave.",
+      "word_count": 7,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "match",
+        "similarity": 0.638,
+        "min_similarity": 0.638,
+        "low_window_share": 0.0,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": false
+      },
+      "asr": {
+        "language": "English",
+        "confidence": 1.0,
+        "needs_review": false,
+        "language_rechecked": false,
+        "alternative": null
+      }
+    },
+    {
+      "id": 6,
+      "kind": "note",
+      "start_sec": 55.7,
+      "end_sec": 61.5,
+      "duration_sec": 5.8,
+      "time_label": "00:55",
+      "audio_file": "notes/note_06.wav",
+      "text": "الوزن 3 جرام، والحجم 50 مل.",
+      "word_count": 6,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "match",
+        "similarity": 0.776,
+        "min_similarity": 0.776,
+        "low_window_share": 0.0,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": false
+      },
+      "asr": {
+        "language": "Arabic",
+        "confidence": 0.89,
+        "needs_review": false,
+        "language_rechecked": false,
+        "alternative": null
+      }
+    },
+    {
+      "id": 7,
+      "kind": "note",
+      "start_sec": 169.27,
+      "end_sec": 172.79,
+      "duration_sec": 3.52,
+      "time_label": "02:49",
+      "audio_file": "notes/note_07.wav",
+      "text": "خلينا الكنترول جروب بدون أي معالجة.",
+      "word_count": 6,
+      "transcript_status": "done",
+      "speaker_check": {
+        "status": "match",
+        "similarity": 0.693,
+        "min_similarity": 0.693,
+        "low_window_share": 0.0,
+        "possible_other_voice": false,
+        "mic_level": 0.04,
+        "quality_warning": false
+      },
+      "asr": {
+        "language": "Arabic",
+        "confidence": 0.88,
+        "needs_review": true,
+        "language_rechecked": false,
+        "alternative": {
+          "engine": "faster-whisper",
+          "model": "turbo",
+          "text": "خلينا ال control group بدون اي معالجة"
+        }
+      }
+    }
+  ],
+  "audio": {
+    "sample_rate": 16000,
+    "full_recording": "full_session.wav",
+    "dropped_frames": 0
+  },
+  "transcription": {
+    "engine": "audar-asr",
+    "model": "audarai/Audar-ASR-V1-Flash",
+    "language": "ar"
+  },
+  "device": {
+    "firmware": "2.0.0",
+    "session_tag": "fd35"
+  },
+  "speaker_verification": {
+    "enabled": true,
+    "model": "wespeaker_en_voxceleb_resnet34.onnx",
+    "reference_source": {
+      "kind": "title",
+      "note_ids": [
+        0,
+        1
+      ],
+      "duration_sec": 4.1
+    },
+    "thresholds": {
+      "match": 0.45,
+      "mismatch": 0.25,
+      "low_window_share": 0.34,
+      "source": "default"
+    },
+    "possible_other_voice_notes": []
+  },
+  "experiment_status": {
+    "state": "completed",
+    "source": "user",
+    "answered_at": "2026-10-01T16:16:50+03:00"
+  }
+}
