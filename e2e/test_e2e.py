@@ -295,8 +295,44 @@ def test_real_deepseek_insights(make_page, server):
     assert len(summary) > 40
     expect(p.tid("insights-doc-score")).to_contain_text("%")
     expect(p.tid("insights-caveat")).to_be_visible()                 # the novelty estimate says it is not a literature search
+    # switching the interface language never calls the AI by itself: it offers a one-time translation, then remembers it
+    p.tid("button-toggle-language").click()
+    expect(p.tid("translate-banner")).to_be_visible(timeout=10000)
+    first = p.tid("insights-summary").inner_text()
+    assert first == summary                                            # still the original text, nothing was regenerated
+    p.tid("button-translate-insights").click()
+    expect(p.tid("translate-banner")).to_have_count(0, timeout=90000)
+    assert p.tid("insights-summary").inner_text() != summary
+    p.tid("button-toggle-language").click()                            # back: instant, from the stored original
+    expect(p.tid("insights-summary")).to_have_text(summary)
+    expect(p.tid("translate-banner")).to_have_count(0)
     p.goto("/dashboard")
-    expect(p.tid("insights-latest")).to_be_visible()                 # and the dashboard Insights card picked it up
+    expect(p.tid("card-insights-summary")).to_have_count(0)           # no Insights on the home page
     assert os.environ["DEEPSEEK_API_KEY"] not in p.pg.content()      # the key never reaches the browser
     me = httpx.get(server.url + "/api/health").text
     assert os.environ["DEEPSEEK_API_KEY"] not in me
+
+
+def test_delete_an_experiment_for_real(make_page, server):
+    p = make_page()
+    p.register("Dr. Del", "del@lab.com")
+    keep = p.create_experiment("Keep me", "")
+    p.goto("/dashboard")
+    gone = p.create_experiment("Throw me away", "")
+    p.add_note("a note that goes with it")
+    p.goto("/dashboard")
+    p.tid("button-delete-" + gone).click()
+    p.tid("button-cancel-delete").click()
+    expect(p.tid("card-experiment-" + gone)).to_be_visible()          # cancel keeps it
+    p.tid("button-delete-" + gone).click()
+    p.tid("button-confirm-delete").click()
+    expect(p.tid("card-experiment-" + gone)).to_have_count(0)
+    p.pg.reload()                                                      # gone from the database too
+    expect(p.tid("card-experiment-" + keep)).to_be_visible()
+    expect(p.tid("card-experiment-" + gone)).to_have_count(0)
+    p.goto("/experiments/" + gone)
+    expect(p.tid("experiment-missing")).to_be_visible()
+    p.goto("/experiments/" + keep)                                     # delete from the experiment page: back to the dashboard
+    p.tid("button-delete-experiment").click()
+    p.tid("button-confirm-delete").click()
+    expect(p.tid("experiments-empty")).to_be_visible()

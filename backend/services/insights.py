@@ -92,7 +92,61 @@ def _literature(settings: Settings, data: dict, client: httpx.Client | None) -> 
     return {"status": "ok", "queries": queries, "sources": sources, "searched": len(papers), **verdict, "generated_at": iso()}
 
 
-def get(db: Database, exp_id: int) -> dict:
+def _texts(res: dict) -> dict:
+    """Every human-readable string of an analysis that is shown in the UI (not note text, not paper titles)."""
+    lit = res.get("literature") or {}
+    t = {"summary": res.get("summary", ""), "key_points": res.get("key_points", []), "next_steps": res.get("next_steps", []),
+         "strengths": res["documentation_quality"]["strengths"], "gaps": res["documentation_quality"]["gaps"],
+         "novelty_rationale": res["novelty"]["rationale"], "novelty_caveat": res["novelty"]["caveat"],
+         "suggestion_reasons": [s.get("reason", "") for s in res.get("note_suggestions", [])]}
+    if lit.get("status") == "ok":
+        t.update({"lit_rationale": lit.get("rationale", ""), "lit_caveat": lit.get("caveat", ""), "lit_why": [p.get("why", "") for p in lit.get("similar", [])]})
+    return {k: v for k, v in t.items() if v}
+
+
+def _apply(res: dict, tr: dict) -> dict:
+    out = json.loads(json.dumps(res))
+    out["summary"] = tr.get("summary", out.get("summary", ""))
+    for k in ("key_points", "next_steps"):
+        if k in tr:
+            out[k] = tr[k]
+    q = out["documentation_quality"]
+    q["strengths"], q["gaps"] = tr.get("strengths", q["strengths"]), tr.get("gaps", q["gaps"])
+    out["novelty"]["rationale"], out["novelty"]["caveat"] = tr.get("novelty_rationale", out["novelty"]["rationale"]), tr.get("novelty_caveat", out["novelty"]["caveat"])
+    for s, r in zip(out.get("note_suggestions", []), tr.get("suggestion_reasons", [])):
+        s["reason"] = r
+    lit = out.get("literature") or {}
+    if lit.get("status") == "ok":
+        lit["rationale"], lit["caveat"] = tr.get("lit_rationale", lit.get("rationale")), tr.get("lit_caveat", lit.get("caveat"))
+        for p, w in zip(lit.get("similar", []), tr.get("lit_why", [])):
+            p["why"] = w
+    return out
+
+
+def translate(db: Database, settings: Settings, exp_id: int, language: str, client: httpx.Client | None = None) -> None:
+    """Add a translation of the stored analysis (a single cheap call). No-op when it already is in, or already has, that language."""
+    e = db.one("SELECT ai_json FROM experiments WHERE id=?", (exp_id,))
+    res = json.loads(e["ai_json"]) if e and e["ai_json"] else None
+    if res is None:
+        raise ai_service.AiError("there is no analysis to translate yet")
+    if res.get("meta", {}).get("language") == language or language in res.get("translations", {}):
+        return
+    tr = ai_service.translate_texts(settings, _texts(res), LANGUAGES[language], client)
+    res.setdefault("translations", {})[language] = tr
+    with db.tx() as c:
+        c.execute("UPDATE experiments SET ai_json=? WHERE id=?", (json.dumps(res, ensure_ascii=False), exp_id))
+
+
+def get(db: Database, exp_id: int, language: str | None = None) -> dict:
     e = db.one("SELECT ai_status, ai_json, ai_error, ai_updated_at FROM experiments WHERE id=?", (exp_id,))
-    return {"status": e["ai_status"], "result": json.loads(e["ai_json"]) if e["ai_json"] else None,
-            "error": e["ai_error"], "updated_at": e["ai_updated_at"]}
+    res = json.loads(e["ai_json"]) if e["ai_json"] else None
+    needs = False
+    if res is not None:
+        trs = res.pop("translations", {})
+        if language in LANGUAGES and res.get("meta", {}).get("language") != language:
+            if language in trs:
+                res = _apply(res, trs[language])
+                res["meta"]["language"] = language
+            else:
+                needs = True                                     # shown in its original language until the user asks for a translation
+    return {"status": e["ai_status"], "result": res, "error": e["ai_error"], "updated_at": e["ai_updated_at"], "needs_translation": needs}

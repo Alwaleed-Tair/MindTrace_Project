@@ -84,7 +84,9 @@ export const api = {
   notifications: () => get<{ unread_count: number; items: NotificationItem[] }>('/notifications?limit=30'),
   markRead: (ids?: number[]) => post<{ marked: number }>('/notifications/read', ids ? { ids } : {}),
 
-  insights: (id: string) => get<Insights>(`/experiments/${encodeURIComponent(id)}/insights`),
+  insights: (id: string, language: string) => get<Insights>(`/experiments/${encodeURIComponent(id)}/insights?language=${language}`),
+  translateInsights: (id: string, language: string) => post<Insights>(`/experiments/${encodeURIComponent(id)}/insights/translate?language=${language}`),
+  deleteExperiment: (id: string) => del(`/experiments/${encodeURIComponent(id)}`),
   refreshInsights: (id: string, language: string) => post<{ status: string }>(`/experiments/${encodeURIComponent(id)}/insights?language=${language}`),
 
   simulateCollaboratorNote: (experimentId?: string) => post<{ experiment_id: string }>('/dev/simulate-collaborator-note', experimentId ? { experiment_id: experimentId } : {}),

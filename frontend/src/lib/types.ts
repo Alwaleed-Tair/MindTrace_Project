@@ -114,6 +114,7 @@ export interface Insights {
   error: string | null;
   updated_at: string | null;
   ai_configured: boolean;
+  needs_translation?: boolean;
 }
 
 export type NotificationKind = 'note_added' | 'note_updated' | 'collaborator_added' | 'status_changed';

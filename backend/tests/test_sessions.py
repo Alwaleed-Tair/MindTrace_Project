@@ -200,3 +200,29 @@ def test_titles_never_merge_across_researchers(app):
     post(app, token(a), sample())
     post(app, token(b), sample())
     assert len(a.get("/api/experiments").json()["items"]) == 1 and len(b.get("/api/experiments").json()["items"]) == 1
+
+
+def test_deleting_an_experiment_removes_its_notes_recordings_and_audio(app, tmp_path):
+    u = new_client(app, "del@x.com")
+    h = token(u)
+    r = post(app, h, sample(), [("files", ("notes/note_01.wav", make_wav(), "audio/wav"))])
+    eid, sid = r.json()["experiment_id"], sample()["session_id"]
+    assert u.get(f"/api/sessions/{sid}/audio/notes/note_01.wav").status_code == 200
+    other = new_client(app, "o@x.com")
+    assert other.delete(f"/api/experiments/{eid}").status_code == 404              # a stranger cannot delete it
+    assert u.delete(f"/api/experiments/{eid}").status_code == 204
+    assert u.get(f"/api/experiments/{eid}").status_code == 404
+    assert u.get("/api/experiments").json()["items"] == [] and u.get("/api/sessions").json()["total"] == 0
+    assert u.get(f"/api/sessions/{sid}/audio/notes/note_01.wav").status_code == 404
+    assert not list((tmp_path / "data" / "audio").rglob("*.wav"))
+    again = post(app, h, sample())                                                  # the same recording can come back as a new experiment
+    assert again.status_code == 201 and len(u.get("/api/experiments").json()["items"]) == 1
+
+
+def test_a_collaborator_cannot_delete_but_the_owner_can(app):
+    a, b = new_client(app, "own@x.com", "Owner"), new_client(app, "col@x.com", "Collab")
+    eid = make_exp(a)["id"]
+    a.post(f"/api/experiments/{eid}/collaborators", json={"identifier": "col@x.com"})
+    assert b.delete(f"/api/experiments/{eid}").status_code == 403
+    assert a.delete(f"/api/experiments/{eid}").status_code == 204
+    assert b.get("/api/experiments").json()["items"] == []

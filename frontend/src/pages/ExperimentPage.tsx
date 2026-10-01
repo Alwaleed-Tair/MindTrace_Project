@@ -1,12 +1,13 @@
-import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Sparkles, UserPlus } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Sparkles, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { StatusPill } from '@/components/common/StatusPill';
+import { DeleteExperimentDialog } from '@/components/dashboard/DeleteExperimentDialog';
 import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
 import { MetricCard } from '@/components/dashboard/MetricCards';
 import { StatusActions } from '@/components/dashboard/StatusActions';
 import { AddNoteCard, NOTE_TEXTAREA_ID } from '@/components/experiment/AddNoteCard';
-import { InsightsTab, OriginalityCard, useInsightsLanguageSync } from '@/components/experiment/InsightsPanels';
+import { InsightsTab, OriginalityCard } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -55,7 +56,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
     dictation.toggle();
   };
   const [peopleOpen, setPeopleOpen] = useState(false);
-  useInsightsLanguageSync(experiment.id);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const setStatus = useSetStatus();
   const notes = experiment.notes ?? [];
   const weekAgo = Date.now() - 7 * 86400_000;
@@ -89,6 +90,12 @@ function Detail({ experiment }: { experiment: Experiment }) {
               <UserPlus size={13} />
               {t.addPeople}
             </button>
+            {experiment.role === 'owner' && (
+              <button type="button" onClick={() => setDeleteOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:border-destructive/50 hover:text-destructive" data-testid="button-delete-experiment">
+                <Trash2 size={13} />
+                {t.deleteExperiment}
+              </button>
+            )}
           </div>
         </div>
         <button type="button" onClick={toggleVoice} className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${recording ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground shadow-[0_10px_25px_hsl(var(--primary)/.15)] hover:-translate-y-0.5'}`} data-testid="button-toggle-recording">
@@ -141,6 +148,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
       {tab === 'insights' && <InsightsTab experiment={experiment} />}
 
       {setStatus.isError && <p className="mt-4 text-xs font-semibold text-destructive" role="alert">{t.statusUpdateFailed}</p>}
+      {deleteOpen && <DeleteExperimentDialog experiment={experiment} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => navigate('/dashboard')} />}
       {peopleOpen && <AddPeopleDialog experiment={experiment} open={peopleOpen} onOpenChange={setPeopleOpen} />}
     </div>
   );

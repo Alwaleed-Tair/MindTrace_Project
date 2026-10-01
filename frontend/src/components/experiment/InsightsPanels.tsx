@@ -1,7 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { ExternalLink, Lightbulb, RefreshCw, Sparkles } from 'lucide-react';
+import { ExternalLink, Languages, Lightbulb, RefreshCw, Sparkles } from 'lucide-react';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useInsights, useRefreshInsights, useUpdateNote } from '@/hooks/queries';
+import { useInsights, useRefreshInsights, useTranslateInsights, useUpdateNote } from '@/hooks/queries';
 import { fill } from '@/lib/format';
 import type { Experiment, Insights, Literature, SimilarPaper } from '@/lib/types';
 
@@ -82,6 +81,7 @@ export function OriginalityCard({ experiment }: { experiment: Experiment }) {
         <Lightbulb size={16} className="text-primary" />
       </div>
       <div className="mt-4 flex justify-center"><CircularScore value={score} /></div>
+      <p className="mt-3 text-center text-[11px] text-muted-foreground" data-testid="originality-scale">{t.origScale}</p>
       <p className="mt-4 text-xs leading-6 text-muted-foreground" dir="auto" data-testid="originality-rationale">{hasLit ? lit!.rationale : literatureNote(lit, t)}</p>
       {hasLit && (
         <>
@@ -97,6 +97,7 @@ export function OriginalityCard({ experiment }: { experiment: Experiment }) {
 /** The Insights tab: the DeepSeek review of the experiment. Suggestions only; the researcher accepts or ignores them. */
 export function InsightsTab({ experiment }: { experiment: Experiment }) {
   const { t, language } = usePreferences();
+  const translate = useTranslateInsights(experiment.id);
   const q = useInsights(experiment.id);
   const refresh = useRefreshInsights(experiment.id);
   const update = useUpdateNote(experiment.id);
@@ -114,6 +115,15 @@ export function InsightsTab({ experiment }: { experiment: Experiment }) {
           {t.refreshInsights}
         </button>
       </div>
+      {r && q.data?.needs_translation && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs" data-testid="translate-banner">
+          <span className="text-muted-foreground">{translate.isError ? t.translateFailed : t.translateHint}</span>
+          <button type="button" disabled={translate.isPending} onClick={() => translate.mutate(language)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground disabled:opacity-50" data-testid="button-translate-insights">
+            <Languages size={13} />
+            {translate.isPending ? t.translating : t.translateNow}
+          </button>
+        </div>
+      )}
       {r ? (
         <div className="grid gap-5 md:grid-cols-2">
           <div className="surface p-6 md:col-span-2">
@@ -130,6 +140,7 @@ export function InsightsTab({ experiment }: { experiment: Experiment }) {
           </div>
           <div className="surface p-6" data-testid="insights-originality">
             <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">{t.origTitle}</h3><strong className="font-mono text-xl" data-testid="insights-originality-score">{r.literature?.status === 'ok' ? r.literature.score : r.novelty.score}</strong></div>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t.origScale}</p>
             <p className="mt-3 text-xs leading-6" dir="auto">{r.literature?.status === 'ok' ? r.literature.rationale : r.novelty.rationale}</p>
             {r.literature?.status === 'ok' && (
               <>
@@ -168,21 +179,4 @@ export function InsightsTab({ experiment }: { experiment: Experiment }) {
       )}
     </div>
   );
-}
-
-/** The AI texts are written once, in one language. When the interface language changes, ask for them again in the new one. */
-export function useInsightsLanguageSync(experimentId: string) {
-  const { language } = usePreferences();
-  const q = useInsights(experimentId);
-  const refresh = useRefreshInsights(experimentId);
-  const asked = useRef<string | null>(null);
-  const done = q.data?.status === 'done' && q.data.ai_configured;
-  const writtenIn = q.data?.result?.meta?.language;
-  useEffect(() => {
-    if (!done || writtenIn === language) return;
-    const key = `${language}|${q.data?.updated_at}`;
-    if (asked.current === key || refresh.isPending) return;
-    asked.current = key;
-    refresh.mutate(language);
-  }, [done, writtenIn, language, q.data?.updated_at, refresh]);
 }

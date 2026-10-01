@@ -194,3 +194,44 @@ def test_insights_are_written_in_the_interface_language(tmp_path):
         assert res["meta"]["language"] == lang and f"in {name}." in seen[-1]
     u.post(f"/api/experiments/{eid}/insights?language=xx")                    # unknown values fall back to the server default
     assert u.get(f"/api/experiments/{eid}/insights").json()["result"]["meta"]["language"] == "ar"
+
+
+def test_translation_is_one_call_then_kept_and_switching_back_is_free(tmp_path):
+    calls = {"analysis": 0, "translate": 0}
+    tr_prompt = "Translate the values"
+
+    def handler(req: httpx.Request):
+        body = json.loads(req.content)
+        if tr_prompt in body["messages"][0]["content"]:
+            calls["translate"] += 1
+            src = json.loads(body["messages"][1]["content"].split("\n", 1)[1])
+            return reply({k: ([f"EN {x}" for x in v] if isinstance(v, list) else f"EN {v}") for k, v in src.items()})
+        calls["analysis"] += 1
+        return reply(good())
+    app, u = setup(tmp_path, handler, ai_auto=False)
+    eid = u.post("/api/experiments", json={"title": "T"}).json()["id"]
+    u.post(f"/api/experiments/{eid}/notes", json={"text": "قسنا الحرارة"})
+    u.post(f"/api/experiments/{eid}/insights?language=ar")
+    ar = u.get(f"/api/experiments/{eid}/insights?language=ar").json()
+    assert ar["needs_translation"] is False and ar["result"]["summary"] == "تجربة قياس حرارة."
+    # asking for English alone never spends tokens: it only says a translation is available
+    en = u.get(f"/api/experiments/{eid}/insights?language=en").json()
+    assert en["needs_translation"] is True and en["result"]["summary"] == "تجربة قياس حرارة." and calls["translate"] == 0
+    r = u.post(f"/api/experiments/{eid}/insights/translate?language=en").json()
+    assert r["needs_translation"] is False and r["result"]["summary"] == "EN تجربة قياس حرارة." and r["result"]["meta"]["language"] == "en"
+    assert r["result"]["note_suggestions"][0]["suggested_text"] == good()["note_suggestions"][0]["suggested_text"]       # note text is never translated
+    u.post(f"/api/experiments/{eid}/insights/translate?language=en")                      # second time: no new call
+    for lang in ("ar", "en", "ar", "en"):
+        assert u.get(f"/api/experiments/{eid}/insights?language={lang}").json()["needs_translation"] is False
+    assert calls == {"analysis": 1, "translate": 1}
+    assert u.get(f"/api/experiments/{eid}/insights").json()["result"]["meta"]["language"] == "ar"
+    assert "translations" not in u.get(f"/api/experiments/{eid}/insights").json()["result"]
+
+
+def test_translation_needs_an_analysis_a_valid_language_and_membership(tmp_path):
+    app, u = setup(tmp_path, lambda r: reply(good()), ai_auto=False)
+    eid = u.post("/api/experiments", json={"title": "T"}).json()["id"]
+    assert u.post(f"/api/experiments/{eid}/insights/translate?language=en").status_code == 502
+    assert u.post(f"/api/experiments/{eid}/insights/translate?language=fr").status_code == 422
+    stranger = new_client(app, "s@x.com", "Stranger")
+    assert stranger.post(f"/api/experiments/{eid}/insights/translate?language=en").status_code == 404

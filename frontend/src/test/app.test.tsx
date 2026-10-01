@@ -151,7 +151,7 @@ describe('header', () => {
 });
 
 describe('dashboard metrics', () => {
-  it('has no Log Note button, no subtext under Avg. originality, and a dedicated Insights card', async () => {
+  it('has no Log Note button, no subtext under Avg. originality, and no Insights card', async () => {
     signedIn();
     renderApp();
     await screen.findByTestId('experiments-grid');
@@ -163,16 +163,7 @@ describe('dashboard metrics', () => {
     expect(orig.textContent).toBe('Avg. originality78%'); // only the label and the number: no note under it
     expect(screen.queryByTestId('metric-notes')).toBeNull(); // the weekly notes card was removed
     expect(screen.queryByTestId('link-nav-experiments')).toBeNull(); // so was the sidebar Experiments button
-    expect(screen.getByTestId('card-insights-summary')).toHaveTextContent('Insights');
-  });
-
-  it('the Insights card shows the latest AI summary and what needs review', async () => {
-    signedIn();
-    A.stats.mockResolvedValue({ ...emptyStats, insights: { experiments_analyzed: 2, notes_to_review: 3, avg_documentation_quality: 72, latest: { experiment_id: '1', title: 'T', summary: 'The drift repeats after 20 minutes.' } } });
-    renderApp();
-    expect(await screen.findByTestId('insights-quality')).toHaveTextContent('72%');
-    expect(screen.getByTestId('insights-latest')).toHaveTextContent('The drift repeats');
-    expect(screen.getByTestId('card-insights-summary')).toHaveTextContent('3 notes to review');
+    expect(screen.queryByTestId('card-insights-summary')).toBeNull(); // no Insights on the home page
   });
 });
 
@@ -427,25 +418,93 @@ describe('originality from scholarly papers', () => {
   });
 });
 
-describe('AI text follows the interface language', () => {
-  it('asks for the insights again in the new language when the written one differs', async () => {
+describe('AI text follows the interface language without spending tokens', () => {
+  it('asks for the insights in the current language, never regenerates by itself, and offers a one-time translation', async () => {
     signedIn();
     A.getExperiment.mockResolvedValue(exp());
-    A.insights.mockResolvedValue(insightsOf({}, 'ar'));
+    A.insights.mockResolvedValue({ ...insightsOf({}, 'ar'), needs_translation: true });
+    A.translateInsights.mockResolvedValue(insightsOf({}, 'en'));
     A.refreshInsights.mockResolvedValue({ status: 'queued' });
     renderApp('/experiments/1');
-    await waitFor(() => expect(A.refreshInsights).toHaveBeenCalledWith('1', 'en'));
-    expect(A.refreshInsights).toHaveBeenCalledTimes(1);
+    await screen.findByTestId('card-originality');
+    await userEvent.click(await screen.findByTestId('tab-insights'));
+    expect(A.insights).toHaveBeenCalledWith('1', 'en');
+    expect(await screen.findByTestId('translate-banner')).toBeInTheDocument();
+    expect(A.refreshInsights).not.toHaveBeenCalled();
+    expect(A.translateInsights).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId('button-translate-insights'));
+    await waitFor(() => expect(A.translateInsights).toHaveBeenCalledWith('1', 'en'));
+    expect(A.refreshInsights).not.toHaveBeenCalled();
   });
 
-  it('does nothing when the text is already in the interface language', async () => {
+  it('no banner when the analysis is already in the interface language', async () => {
     signedIn();
     A.getExperiment.mockResolvedValue(exp());
-    A.insights.mockResolvedValue(insightsOf({}, 'en'));
+    A.insights.mockResolvedValue({ ...insightsOf({}, 'en'), needs_translation: false });
     renderApp('/experiments/1');
-    await screen.findByTestId('card-originality');
-    await new Promise((r) => setTimeout(r, 50));
-    expect(A.refreshInsights).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByTestId('tab-insights'));
+    await screen.findByTestId('insights-originality');
+    expect(screen.queryByTestId('translate-banner')).toBeNull();
+  });
+});
+
+describe('originality note', () => {
+  it('says higher is better, in a small note', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.insights.mockResolvedValue(insightsOf());
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('originality-scale')).toHaveTextContent('Higher is better');
+  });
+});
+
+describe('delete experiment', () => {
+  it('the owner confirms, then the experiment is deleted and gone from the list', async () => {
+    signedIn([exp({ id: '7', title: 'Bad run' })]);
+    A.deleteExperiment.mockImplementation(async () => { A.listExperiments.mockResolvedValue([]); });
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-delete-7'));
+    expect(await screen.findByTestId('dialog-delete-experiment')).toHaveTextContent('Bad run');
+    expect(A.deleteExperiment).not.toHaveBeenCalled(); // asking first
+    await userEvent.click(screen.getByTestId('button-confirm-delete'));
+    await waitFor(() => expect(A.deleteExperiment).toHaveBeenCalledWith('7'));
+    await waitFor(() => expect(screen.queryByTestId('card-experiment-7')).toBeNull());
+  });
+
+  it('cancel keeps the experiment', async () => {
+    signedIn([exp({ id: '7' })]);
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-delete-7'));
+    await userEvent.click(await screen.findByTestId('button-cancel-delete'));
+    expect(A.deleteExperiment).not.toHaveBeenCalled();
+    expect(screen.getByTestId('card-experiment-7')).toBeInTheDocument();
+  });
+
+  it('a collaborator does not get a delete button', async () => {
+    signedIn([exp({ id: '8', role: 'editor', owner: omar })]);
+    renderApp();
+    await screen.findByTestId('card-experiment-8');
+    expect(screen.queryByTestId('button-delete-8')).toBeNull();
+  });
+
+  it('deleting from the experiment page goes back to the dashboard', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.deleteExperiment.mockResolvedValue(undefined);
+    renderApp('/experiments/1');
+    await userEvent.click(await screen.findByTestId('button-delete-experiment'));
+    await userEvent.click(await screen.findByTestId('button-confirm-delete'));
+    expect(await screen.findByTestId('experiments-grid')).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the dialog when the server refuses', async () => {
+    signedIn([exp({ id: '7' })]);
+    A.deleteExperiment.mockRejectedValue(new ApiError(500, 'boom'));
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-delete-7'));
+    await userEvent.click(await screen.findByTestId('button-confirm-delete'));
+    expect(await screen.findByTestId('delete-error')).toBeInTheDocument();
+    expect(screen.getByTestId('card-experiment-7')).toBeInTheDocument();
   });
 });
 

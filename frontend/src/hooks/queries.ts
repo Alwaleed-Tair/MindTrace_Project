@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePreferences } from '@/context/PreferencesContext';
 import { api, ApiError } from '@/lib/api';
 import type { Experiment, Insights, Status } from '@/lib/types';
 
@@ -22,9 +23,10 @@ export function useRecentCollaborators(enabled: boolean) {
 }
 
 export function useInsights(id: string) {
+  const { language } = usePreferences();
   return useQuery<Insights>({
-    queryKey: ['insights', id],
-    queryFn: () => api.insights(id),
+    queryKey: ['insights', id, language],
+    queryFn: () => api.insights(id, language),
     retry,
     refetchInterval: (q) => (q.state.data && ['queued', 'running'].includes(q.state.data.status) ? 2000 : false),
   });
@@ -101,6 +103,28 @@ export function useRefreshInsights(id: string) {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['insights', id] }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['experiment', id] });
+      void qc.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+/** Translate the existing analysis once (kept on the server: switching language again costs nothing). */
+export function useTranslateInsights(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (language: string) => api.translateInsights(id, language),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['insights', id] }),
+  });
+}
+
+export function useDeleteExperiment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteExperiment(id),
+    onSuccess: (_d, id) => {
+      qc.removeQueries({ queryKey: ['experiment', id] });
+      qc.removeQueries({ queryKey: ['insights', id] });
+      void qc.invalidateQueries({ queryKey: ['experiments'] });
       void qc.invalidateQueries({ queryKey: ['stats'] });
     },
   });
