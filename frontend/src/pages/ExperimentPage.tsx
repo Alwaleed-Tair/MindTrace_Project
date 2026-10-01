@@ -5,17 +5,18 @@ import { StatusPill } from '@/components/common/StatusPill';
 import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
 import { MetricCard } from '@/components/dashboard/MetricCards';
 import { StatusActions } from '@/components/dashboard/StatusActions';
-import { AddNoteCard } from '@/components/experiment/AddNoteCard';
-import { InsightsSummaryCard, InsightsTab, OriginalityCard } from '@/components/experiment/InsightsPanels';
+import { AddNoteCard, NOTE_TEXTAREA_ID } from '@/components/experiment/AddNoteCard';
+import { InsightsTab, OriginalityCard, useInsightsLanguageSync } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useExperiment, useSetStatus } from '@/hooks/queries';
+import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
 import type { Experiment } from '@/lib/types';
 
-type Tab = 'overview' | 'notes' | 'insights';
+type Tab = 'overview' | 'insights';
 
 function NotFoundExperiment({ message }: { message: string }) {
   const { t } = usePreferences();
@@ -35,8 +36,18 @@ function Detail({ experiment }: { experiment: Experiment }) {
   const { t, language } = usePreferences();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<Tab>('overview');
-  const [recording, setRecording] = useState(false);
+  const [draft, setDraft] = useState('');
+  const dictation = useDictation(language === 'ar' ? 'ar-SA' : 'en-US', (text) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text)));
+  const recording = dictation.listening;
+  const toggleVoice = () => {
+    if (!recording) {
+      setTab('overview');
+      setTimeout(() => document.getElementById(NOTE_TEXTAREA_ID)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+    }
+    dictation.toggle();
+  };
   const [peopleOpen, setPeopleOpen] = useState(false);
+  useInsightsLanguageSync(experiment.id);
   const setStatus = useSetStatus();
   const notes = experiment.notes ?? [];
   const weekAgo = Date.now() - 7 * 86400_000;
@@ -46,7 +57,6 @@ function Detail({ experiment }: { experiment: Experiment }) {
 
   const tabs: [Tab, string, typeof LayoutDashboard][] = [
     ['overview', t.overview, LayoutDashboard],
-    ['notes', t.notes, FileText],
     ['insights', t.insights, Sparkles],
   ];
 
@@ -63,7 +73,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
             <span className="font-mono text-[10px] text-muted-foreground">{experiment.code}</span>
             <div className="flex -space-x-2 rtl:space-x-reverse">{people.slice(0, 5).map((p) => <Avatar key={p.id} person={p} size={24} ring />)}</div>
           </div>
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-.055em] sm:text-5xl" data-testid="experiment-title">{experiment.title}</h1>
+          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-.04em] sm:text-4xl" data-testid="experiment-title">{experiment.title}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{experiment.summary}</p>
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <StatusActions id={experiment.id} status={experiment.status} onSetStatus={(id, status) => setStatus.mutate({ id, status })} />
@@ -73,7 +83,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
             </button>
           </div>
         </div>
-        <button type="button" onClick={() => setRecording(!recording)} className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${recording ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground shadow-[0_10px_25px_hsl(var(--primary)/.15)] hover:-translate-y-0.5'}`} data-testid="button-toggle-recording">
+        <button type="button" onClick={toggleVoice} className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${recording ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground shadow-[0_10px_25px_hsl(var(--primary)/.15)] hover:-translate-y-0.5'}`} data-testid="button-toggle-recording">
           {recording ? (
             <>
               <span className="recording-pulse h-2.5 w-2.5 rounded-full bg-white" />
@@ -106,26 +116,19 @@ function Detail({ experiment }: { experiment: Experiment }) {
 
       {tab === 'overview' && (
         <>
-          <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="experiment-metrics">
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 " data-testid="experiment-metrics">
             <MetricCard testId="metric-notes-count" icon={FileText} label={t.notesMetric} value={String(notes.length)} note={`${thisWeek} ${t.newThisWeek}`} />
             <MetricCard testId="metric-duration" icon={Clock3} label={t.duration} value={experiment.duration} note={`${t.lastUpdate} ${relativeTime(experiment.updated_at, language)}`} />
-            <InsightsSummaryCard experiment={experiment} />
           </div>
           {/* the Notes timeline is the wide main column; Add Note is the narrow one */}
           <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,.9fr)]">
             <NotesTimeline experimentId={experiment.id} notes={notes} showAuthors={shared} />
             <aside className="space-y-5">
-              <AddNoteCard experimentId={experiment.id} />
+              <AddNoteCard experimentId={experiment.id} text={draft} onText={setDraft} dictation={dictation} />
               <OriginalityCard experiment={experiment} />
             </aside>
           </div>
         </>
-      )}
-      {tab === 'notes' && (
-        <div className="mt-7 grid items-start gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,.9fr)]">
-          <NotesTimeline experimentId={experiment.id} notes={notes} showAuthors={shared} />
-          <aside><AddNoteCard experimentId={experiment.id} /></aside>
-        </div>
       )}
       {tab === 'insights' && <InsightsTab experiment={experiment} />}
 

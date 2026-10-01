@@ -97,7 +97,7 @@ export function useAddCollaborator(id: string) {
 export function useRefreshInsights(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.refreshInsights(id),
+    mutationFn: (language: string) => api.refreshInsights(id, language),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['insights', id] }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['experiment', id] });

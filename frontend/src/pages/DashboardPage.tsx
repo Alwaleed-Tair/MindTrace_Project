@@ -33,7 +33,7 @@ export default function DashboardPage() {
     <>
       <div className="animate-in flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[.25em] text-primary" data-testid="today">{longDate(language)}</p>
+          <p className="font-mono text-[10px] uppercase tracking-[.14em] text-primary" data-testid="today">{longDate(language)}</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-.055em] sm:text-4xl" data-testid="greeting">{fill(t[greetingKey()], { name: greetName })}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{t.welcomeSub}</p>
         </div>

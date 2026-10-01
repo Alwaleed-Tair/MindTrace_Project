@@ -28,7 +28,8 @@ def sample() -> dict:
 
 
 def make_app(tmp_path, ai_handler=None, **kw):
-    settings = Settings(data_dir=tmp_path / "data", deepseek_api_key=kw.pop("deepseek_api_key", ""), **kw)
+    settings = Settings(data_dir=tmp_path / "data", deepseek_api_key=kw.pop("deepseek_api_key", ""),
+                        literature_enabled=kw.pop("literature_enabled", False), **kw)
     ai_client = httpx.Client(transport=httpx.MockTransport(ai_handler)) if ai_handler else None
     return create_app(settings, ai_client)
 

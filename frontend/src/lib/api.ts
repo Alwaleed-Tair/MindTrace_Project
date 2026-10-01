@@ -85,7 +85,7 @@ export const api = {
   markRead: (ids?: number[]) => post<{ marked: number }>('/notifications/read', ids ? { ids } : {}),
 
   insights: (id: string) => get<Insights>(`/experiments/${encodeURIComponent(id)}/insights`),
-  refreshInsights: (id: string) => post<{ status: string }>(`/experiments/${encodeURIComponent(id)}/insights`),
+  refreshInsights: (id: string, language: string) => post<{ status: string }>(`/experiments/${encodeURIComponent(id)}/insights?language=${language}`),
 
   simulateCollaboratorNote: (experimentId?: string) => post<{ experiment_id: string }>('/dev/simulate-collaborator-note', experimentId ? { experiment_id: experimentId } : {}),
 };

@@ -26,7 +26,6 @@ def test_register_use_logout_login_and_everything_is_still_there(make_page, serv
     exp_id = p.create_experiment("Surface tension under vibration", "What changes?")
     p.add_note("The film broke at 40 Hz")
     p.add_note("مرحبا: ملاحظة بالعربي مع English words")
-    p.tid("tab-notes").click()
     expect(p.tid("notes-count")).to_contain_text("2 entries")
     p.tid("button-complete-" + exp_id).click()
     expect(p.tid("experiment-page")).to_have_attribute("data-status", "Completed")
@@ -291,7 +290,7 @@ def test_real_deepseek_insights(make_page, server):
     p.pg.locator("[data-testid^=link-experiment-]", has_text="Ambient temperature").click()
     p.tid("tab-insights").click()
     p.tid("button-refresh-insights").click()
-    expect(p.tid("insights-summary")).to_be_visible(timeout=90000)   # a real round trip to DeepSeek
+    expect(p.tid("insights-summary")).to_be_visible(timeout=150000)   # a real round trip to DeepSeek
     summary = p.tid("insights-summary").inner_text()
     assert len(summary) > 40
     expect(p.tid("insights-doc-score")).to_contain_text("%")

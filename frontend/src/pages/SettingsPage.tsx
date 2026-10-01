@@ -30,10 +30,10 @@ export default function SettingsPage() {
 
   return (
     <div className="animate-in max-w-3xl">
-      <p className="font-mono text-[10px] uppercase tracking-[.25em] text-primary">MindTrace / preferences</p>
+      <p className="font-mono text-[10px] uppercase tracking-[.14em] text-primary">MindTrace / preferences</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-[-.055em]">{t.settings}</h1>
       <p className="mt-2 text-sm text-muted-foreground">{t.settingsSub}</p>
-      <div className="mt-9 overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="mt-9 overflow-hidden surface">
         {user && (
           <div className="flex items-start gap-4 border-b border-border p-5 sm:p-7">
             <Avatar person={user} size={40} />

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -38,52 +38,52 @@
 }
 
 :root {
-  --background: 180 31% 96%;
-  --foreground: 190 32% 16%;
-  --border: 180 18% 86%;
-  --input: 180 18% 82%;
-  --ring: 172 57% 44%;
-  --card: 180 25% 99%;
-  --card-foreground: 190 32% 16%;
-  --primary: 173 58% 39%;
-  --primary-foreground: 180 28% 98%;
-  --secondary: 180 28% 91%;
-  --secondary-foreground: 190 34% 23%;
-  --muted: 180 20% 92%;
-  --muted-foreground: 190 15% 45%;
-  --accent: 166 63% 76%;
-  --accent-foreground: 190 36% 18%;
-  --destructive: 4 69% 54%;
-  --destructive-foreground: 0 0% 98%;
-  --sidebar: 191 46% 19%;
-  --sidebar-foreground: 174 35% 90%;
-  --sidebar-border: 190 33% 27%;
-  --app-font-sans: 'DM Sans', ui-sans-serif, sans-serif;
-  --app-font-mono: 'Space Mono', ui-monospace, monospace;
+  --background: 210 25% 97.5%;
+  --foreground: 215 28% 14%;
+  --border: 214 20% 90%;
+  --input: 214 18% 84%;
+  --ring: 174 62% 38%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 28% 14%;
+  --primary: 174 63% 33%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 25% 94%;
+  --secondary-foreground: 215 28% 20%;
+  --muted: 210 22% 95%;
+  --muted-foreground: 215 14% 42%;
+  --accent: 170 55% 88%;
+  --accent-foreground: 175 50% 20%;
+  --destructive: 4 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 215 22% 28%;
+  --sidebar-border: 214 20% 91%;
+  --app-font-sans: 'DM Sans', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: 'DM Sans', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
   --radius: 0.9rem;
 }
 
 .dark {
-  --background: 192 32% 9%;
-  --foreground: 170 28% 92%;
-  --border: 190 22% 22%;
-  --input: 190 22% 26%;
-  --ring: 172 57% 53%;
-  --card: 191 30% 13%;
-  --card-foreground: 170 28% 92%;
-  --primary: 169 61% 52%;
-  --primary-foreground: 191 46% 12%;
-  --secondary: 190 25% 20%;
-  --secondary-foreground: 170 28% 88%;
-  --muted: 190 23% 18%;
-  --muted-foreground: 185 16% 64%;
-  --accent: 168 40% 26%;
-  --accent-foreground: 171 45% 85%;
-  --destructive: 4 61% 48%;
-  --destructive-foreground: 0 0% 98%;
-  --sidebar: 191 43% 11%;
-  --sidebar-foreground: 174 31% 89%;
-  --sidebar-border: 190 30% 19%;
+  --background: 218 24% 8.5%;
+  --foreground: 210 20% 93%;
+  --border: 217 18% 19%;
+  --input: 217 18% 25%;
+  --ring: 170 60% 52%;
+  --card: 218 22% 11.5%;
+  --card-foreground: 210 20% 93%;
+  --primary: 170 60% 50%;
+  --primary-foreground: 218 40% 8%;
+  --secondary: 217 18% 17%;
+  --secondary-foreground: 210 20% 88%;
+  --muted: 217 18% 15%;
+  --muted-foreground: 215 12% 62%;
+  --accent: 172 35% 22%;
+  --accent-foreground: 170 50% 85%;
+  --destructive: 4 62% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar: 218 24% 10%;
+  --sidebar-foreground: 210 18% 85%;
+  --sidebar-border: 217 18% 17%;
 }
 
 @layer base {
@@ -115,7 +115,6 @@
   border-radius: 12px;
   object-fit: cover;
   object-position: center;
-  box-shadow: 0 8px 22px hsl(var(--primary) / .08);
 }
 
 .mindtrace-logo-compact {
@@ -140,16 +139,7 @@
   color: hsl(var(--primary));
 }
 
-.mindtrace-logo-inverse .mindtrace-wordmark {
-  color: #fff;
-}
-
-.mindtrace-logo-inverse .mindtrace-wordmark span {
-  color: hsl(var(--accent));
-}
-
 @layer utilities {
-  .font-mono { font-family: var(--app-font-mono); }
   .text-balance { text-wrap: balance; }
   .animate-in { animation: appear 480ms cubic-bezier(.22,.8,.24,1) both; }
   .delay-1 { animation-delay: 70ms; }
@@ -170,20 +160,18 @@
 
 .recording-pulse { animation: breathe 1.8s ease-in-out infinite; }
 
-.app-noise::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: .025;
-  z-index: 50;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+.surface {
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 1px 2px hsl(215 30% 20% / .04), 0 10px 28px -16px hsl(215 30% 20% / .12);
 }
 
-.dashboard-grid {
-  background-image: linear-gradient(hsl(var(--primary) / .035) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary) / .035) 1px, transparent 1px);
-  background-size: 30px 30px;
+.dark .surface {
+  box-shadow: 0 1px 2px hsl(0 0% 0% / .25), 0 12px 30px -18px hsl(0 0% 0% / .6);
 }
+
+.font-mono { font-variant-numeric: tabular-nums; }
 
 .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--primary) / .28); border-radius: 9px; }

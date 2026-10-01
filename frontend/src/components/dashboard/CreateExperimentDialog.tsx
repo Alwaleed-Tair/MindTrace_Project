@@ -13,7 +13,7 @@ export function CreateExperimentDialog({ open, onOpenChange, onCreate, busy, err
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent dir={dir} className="max-w-lg rounded-3xl border-border bg-card p-6 text-card-foreground shadow-2xl sm:p-8" data-testid="dialog-create-experiment">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[.25em] text-primary">New thread / 01</p>
+          <p className="font-mono text-[10px] uppercase tracking-[.14em] text-primary">New thread / 01</p>
           <DialogTitle className="mt-2 text-2xl font-semibold tracking-[-.04em]">{t.createTitle}</DialogTitle>
           <DialogDescription className="mt-2 text-sm text-muted-foreground">{t.createSub}</DialogDescription>
         </div>

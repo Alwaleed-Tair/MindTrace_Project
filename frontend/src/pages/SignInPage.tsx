@@ -58,7 +58,7 @@ export default function SignInPage() {
       </header>
       <section className="flex min-h-[calc(100dvh-92px)] items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-[430px] animate-in">
-          <div className="rounded-3xl border border-border bg-card p-6 shadow-[0_24px_70px_hsl(var(--primary)/.08)] sm:p-9">
+          <div className="surface p-6 shadow-[0_24px_70px_hsl(var(--primary)/.08)] sm:p-9">
             <div className="mb-8 text-center">
               <div className="mb-6 flex justify-center sm:hidden"><Logo compact /></div>
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-primary">MindTrace / 01</p>

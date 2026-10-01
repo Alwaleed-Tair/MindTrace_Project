@@ -28,6 +28,7 @@ class Settings:
     deepseek_base_url: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
     deepseek_model: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"))
     ai_auto: bool = field(default_factory=lambda: _flag("MINDTRACE_AI_AUTO", True))             # analyse right after a session arrives
+    literature_enabled: bool = field(default_factory=lambda: _flag("MINDTRACE_LITERATURE", True))   # originality: search scholarly sources
     ai_timeout_sec: float = field(default_factory=lambda: float(os.environ.get("MINDTRACE_AI_TIMEOUT_SEC", "90")))
     ai_language: str = field(default_factory=lambda: os.environ.get("MINDTRACE_AI_LANGUAGE", "Arabic"))
 

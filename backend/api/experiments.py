@@ -142,11 +142,11 @@ def get_insights(exp_id: str, request: Request, user=Depends(current_user)):
 
 
 @router.post("/experiments/{exp_id}/insights", status_code=202)
-def refresh_insights(exp_id: str, background: BackgroundTasks, request: Request, user=Depends(current_user)):
+def refresh_insights(exp_id: str, background: BackgroundTasks, request: Request, language: str | None = None, user=Depends(current_user)):
     d, st, eid = db(request), settings(request), _id(exp_id)
     ex.require(d, eid, user["id"])
     if not st.ai_configured:
         raise HTTPException(503, "DEEPSEEK_API_KEY is not set on the server")
     insights_service.set_state(d, eid, "queued")
-    background.add_task(insights_service.run, d, st, eid, request.app.state.ai_client)
+    background.add_task(insights_service.run, d, st, eid, request.app.state.ai_client, language if language in ("ar", "en") else None)
     return {"status": "queued"}

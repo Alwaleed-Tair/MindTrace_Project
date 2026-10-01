@@ -80,7 +80,32 @@ export interface InsightsResult {
   note_suggestions: { note_id: number; suggested_text: string; reason: string; confidence: string }[];
   notes_to_review: number[];
   note_kinds: { note_id: number; kind: NoteKind }[];
-  meta?: { model: string; provider: string; generated_at: string };
+  literature?: Literature;
+  meta?: { model: string; provider: string; generated_at: string; language?: string | null };
+}
+
+export interface SimilarPaper {
+  title: string;
+  authors: string[];
+  year: number | null;
+  venue: string;
+  url: string;
+  doi: string;
+  source: string;
+  similarity: 'high' | 'medium' | 'low';
+  why: string;
+}
+
+export interface Literature {
+  status: 'ok' | 'off' | 'skipped' | 'unavailable' | 'failed';
+  score?: number;
+  rationale?: string;
+  caveat?: string;
+  queries?: string[];
+  sources?: string[];
+  searched?: number;
+  similar?: SimilarPaper[];
+  error?: string;
 }
 
 export interface Insights {

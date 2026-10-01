@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, ApiError } from '@/lib/api';
@@ -160,7 +160,7 @@ describe('dashboard metrics', () => {
     expect(orig).toHaveTextContent('Avg. originality');
     expect(orig).toHaveTextContent('78%');
     expect(orig.textContent).not.toMatch(/across all work/i);
-    expect(orig.querySelectorAll('span').length).toBe(1); // only the label: no note span
+    expect(orig.textContent).toBe('Avg. originality78%'); // only the label and the number: no note under it
     expect(screen.queryByTestId('metric-notes')).toBeNull(); // the weekly notes card was removed
     expect(screen.queryByTestId('link-nav-experiments')).toBeNull(); // so was the sidebar Experiments button
     expect(screen.getByTestId('card-insights-summary')).toHaveTextContent('Insights');
@@ -341,12 +341,14 @@ describe('experiment page', () => {
     expect(await screen.findByTestId('experiment-missing')).toHaveTextContent('does not exist');
   });
 
-  it('shows the Notes timeline wide, a compact Add note card, and the Insights card in the top metrics', async () => {
+  it('shows the Notes timeline wide and a compact Add note card; no Notes tab and no Insights card in the metrics', async () => {
     signedIn();
     A.getExperiment.mockResolvedValue(exp({ notes: [{ id: 5, text: 'first note', kind: 'observation', source: 'manual', text_source: 'human', time_label: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true }] }));
     renderApp('/experiments/1');
     const metrics = await screen.findByTestId('experiment-metrics');
-    expect(within(metrics).getByTestId('card-insights-summary')).toBeInTheDocument();
+    expect(within(metrics).queryByTestId('card-insights-summary')).toBeNull();
+    expect(screen.queryByTestId('tab-notes')).toBeNull();
+    expect(screen.getByTestId('tab-insights')).toBeInTheDocument();
     expect(screen.getByTestId('card-notes')).toHaveTextContent('first note');
     const grid = screen.getByTestId('card-notes').parentElement!;
     expect(grid.className).toMatch(/2\.1fr/); // notes column is the wide one
@@ -392,5 +394,128 @@ describe('language', () => {
     expect(document.documentElement.lang).toBe('ar');
     expect(await screen.findByText('التجارب الأخيرة')).toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem('mindtrace.prefs')!).language).toBe('ar');
+  });
+});
+
+
+const PAPER = { title: 'Temperature and reaction rate', authors: ['A. Author'], year: 2010, venue: 'arXiv', url: 'http://arxiv.org/abs/1', doi: '', source: 'arXiv', similarity: 'high' as const, why: 'Same topic.' };
+const insightsOf = (over: Record<string, unknown> = {}, lang = 'en') => ({ status: 'done' as const, error: null, updated_at: 't1', ai_configured: true,
+  result: { summary: 's', documentation_quality: { score: 50, strengths: [], gaps: [] }, novelty: { score: 40, rationale: 'r', caveat: 'c' }, note_suggestions: [], notes_to_review: [], note_kinds: [],
+    meta: { model: 'm', provider: 'deepseek', generated_at: 'x', language: lang },
+    literature: { status: 'ok', score: 64, rationale: 'Known principle.', caveat: 'Limited search.', sources: ['arXiv', 'Crossref'], similar: [PAPER] }, ...over } });
+
+describe('originality from scholarly papers', () => {
+  it('shows the score and the closest papers as links, and says where it searched', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.insights.mockResolvedValue(insightsOf());
+    renderApp('/experiments/1');
+    const card = await screen.findByTestId('card-originality');
+    await waitFor(() => expect(within(card).getByTestId('similar-paper')).toBeInTheDocument());
+    expect(within(card).getByRole('link', { name: /Temperature and reaction rate/ })).toHaveAttribute('href', 'http://arxiv.org/abs/1');
+    expect(card).toHaveTextContent('64');
+    expect(card).toHaveTextContent('Very similar');
+    expect(card).toHaveTextContent('Searched: arXiv, Crossref');
+  });
+
+  it('says so when no related paper was found', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.insights.mockResolvedValue(insightsOf({ literature: { status: 'ok', score: 90, rationale: 'New.', caveat: '', sources: ['arXiv'], similar: [] } }));
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('no-similar-papers')).toBeInTheDocument();
+  });
+});
+
+describe('AI text follows the interface language', () => {
+  it('asks for the insights again in the new language when the written one differs', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.insights.mockResolvedValue(insightsOf({}, 'ar'));
+    A.refreshInsights.mockResolvedValue({ status: 'queued' });
+    renderApp('/experiments/1');
+    await waitFor(() => expect(A.refreshInsights).toHaveBeenCalledWith('1', 'en'));
+    expect(A.refreshInsights).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when the text is already in the interface language', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.insights.mockResolvedValue(insightsOf({}, 'en'));
+    renderApp('/experiments/1');
+    await screen.findByTestId('card-originality');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(A.refreshInsights).not.toHaveBeenCalled();
+  });
+});
+
+describe('sidebar extras', () => {
+  it('the logo goes back to the dashboard', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    renderApp('/experiments/1');
+    await screen.findByTestId('experiment-page');
+    await userEvent.click(screen.getByTestId('link-logo-home'));
+    expect(await screen.findByTestId('experiments-grid')).toBeInTheDocument();
+  });
+
+  it('there is no Experiments button in the sidebar', async () => {
+    signedIn();
+    renderApp();
+    await screen.findByTestId('experiments-grid');
+    expect(screen.queryByTestId('link-nav-experiments')).toBeNull();
+  });
+
+  it('Feedback opens a mock form that can be filled and "sent"', async () => {
+    signedIn();
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-help'));
+    const dialog = await screen.findByTestId('dialog-feedback');
+    expect(screen.getByTestId('button-feedback-send')).toBeDisabled();
+    await userEvent.click(within(dialog).getByTestId('feedback-kind-bug'));
+    await userEvent.type(within(dialog).getByTestId('textarea-feedback'), 'The chart is great');
+    await userEvent.click(screen.getByTestId('button-feedback-send'));
+    expect(await screen.findByTestId('feedback-sent')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('button-feedback-close'));
+    await waitFor(() => expect(screen.queryByTestId('dialog-feedback')).toBeNull());
+  });
+});
+
+describe('voice note (dictation)', () => {
+  class FakeRecognition {
+    static last: FakeRecognition | null = null;
+    lang = ''; continuous = false; interimResults = false;
+    onresult: ((e: unknown) => void) | null = null; onerror: ((e: unknown) => void) | null = null; onend: (() => void) | null = null;
+    start() { FakeRecognition.last = this; }
+    stop() { this.onend?.(); }
+  }
+  const say = (text: string, isFinal = true) => FakeRecognition.last!.onresult!({ resultIndex: 0, results: [{ isFinal, 0: { transcript: text } }] });
+
+  it('the header button starts dictation into the note box; the text can be edited and saved', async () => {
+    (window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeRecognition;
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.addNote.mockResolvedValue({ id: 9 });
+    renderApp('/experiments/1');
+    await userEvent.click(await screen.findByTestId('button-toggle-recording'));
+    expect(FakeRecognition.last!.lang).toBe('en-US');
+    expect(await screen.findByTestId('status-recording')).toBeInTheDocument();
+    act(() => say('we measured twenty five degrees'));
+    expect(screen.getByTestId('textarea-new-note')).toHaveValue('we measured twenty five degrees');
+    act(() => say('and it was stable'));
+    expect(screen.getByTestId('textarea-new-note')).toHaveValue('we measured twenty five degrees and it was stable');
+    await userEvent.click(screen.getByTestId('button-toggle-recording'));
+    await waitFor(() => expect(screen.queryByTestId('status-recording')).toBeNull());
+    await userEvent.click(screen.getByTestId('button-save-note'));
+    await waitFor(() => expect(A.addNote).toHaveBeenCalledWith('1', 'we measured twenty five degrees and it was stable'));
+    delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+  });
+
+  it('says so, and the dictate button is disabled, when the browser cannot do speech recognition', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('dictation-message')).toHaveTextContent('Chrome or Edge');
+    expect(screen.getByTestId('button-dictate')).toBeDisabled();
   });
 });

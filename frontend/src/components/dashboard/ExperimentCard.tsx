@@ -17,9 +17,9 @@ const colorClass: Record<string, string> = {
 };
 
 const stateClass: Record<Status, string> = {
-  Active: 'border-border bg-card',
-  Paused: 'border-amber-400/60 bg-amber-50/50 dark:bg-amber-950/20',
-  Completed: 'border-primary/30 bg-muted/50',
+  Active: '',
+  Paused: '!border-amber-400/50 !bg-amber-50/60 dark:!bg-amber-950/20',
+  Completed: '!bg-muted/40',
 };
 
 export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experiment; onSetStatus: (id: string, status: Status) => void }) {
@@ -29,7 +29,7 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
   const people = [e.owner, ...e.collaborators];
 
   return (
-    <article className={`group rounded-2xl border p-5 transition duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-[0_14px_30px_hsl(var(--primary)/.08)] ${stateClass[e.status]}`} data-testid={`card-experiment-${e.id}`} data-status={e.status}>
+    <article className={`group surface p-5 transition duration-200 hover:border-primary/40 ${stateClass[e.status]}`} data-testid={`card-experiment-${e.id}`} data-status={e.status}>
       <Link href={`/experiments/${e.id}`} className="block rounded-xl" data-testid={`link-experiment-${e.id}`}>
         <div className="flex items-start justify-between gap-4">
           <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colorClass[e.color] ?? colorClass.mint}`}>

@@ -177,3 +177,20 @@ def test_stats_for_the_dashboard_cards(tmp_path):
     assert st["insights"]["experiments_analyzed"] == 1 and st["insights"]["avg_documentation_quality"] == 70
     assert st["insights"]["latest"]["experiment_id"] == r.json()["experiment_id"] and st["insights"]["latest"]["summary"]
     assert st["avg_originality"] == round((50 + 33) / 2)
+
+
+def test_insights_are_written_in_the_interface_language(tmp_path):
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(json.loads(req.content)["messages"][0]["content"])
+        return reply(good())
+    app, u = setup(tmp_path, handler, ai_auto=False)
+    eid = u.post("/api/experiments", json={"title": "T"}).json()["id"]
+    u.post(f"/api/experiments/{eid}/notes", json={"text": "قسنا الحرارة 25 درجة"})
+    for lang, name in (("en", "English"), ("ar", "Arabic")):
+        assert u.post(f"/api/experiments/{eid}/insights?language={lang}").status_code == 202
+        res = u.get(f"/api/experiments/{eid}/insights").json()["result"]
+        assert res["meta"]["language"] == lang and f"in {name}." in seen[-1]
+    u.post(f"/api/experiments/{eid}/insights?language=xx")                    # unknown values fall back to the server default
+    assert u.get(f"/api/experiments/{eid}/insights").json()["result"]["meta"]["language"] == "ar"

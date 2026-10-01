@@ -15,7 +15,7 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit }: { exp
   const { t, language } = usePreferences();
   const shown = limit ? notes.slice(-limit) : notes;
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 sm:p-6" data-testid="card-notes">
+    <section className="surface p-5 sm:p-6" data-testid="card-notes">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold">{t.timeline}</h3>
         <span className="font-mono text-[10px] text-muted-foreground" data-testid="notes-count">{fill(t.entries, { n: notes.length })}</span>
