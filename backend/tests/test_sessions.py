@@ -33,6 +33,8 @@ def test_a_recorded_session_becomes_an_experiment_with_notes(app):
     assert n["source"] == "recording" and n["text_source"] == "asr" and n["asr"]["needs_review"] is True
     assert n["asr"]["alternative"]["text"] and n["time_label"] and n["speaker_check"]["status"] == "match"
     assert u.get(f"/api/sessions/{s['session_id']}").json()["session"] == s       # the original JSON, untouched
+    flags = {n["audio_file"]: n["has_audio"] for n in exp["notes"]}
+    assert flags["notes/note_01.wav"] is True and flags["notes/note_02.wav"] is False        # the UI only shows a player where there is audio
 
 
 def test_unknown_fields_are_kept(app):

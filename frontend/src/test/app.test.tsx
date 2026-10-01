@@ -1,0 +1,395 @@
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { api, ApiError } from '@/lib/api';
+import { emptyStats, exp, lina, mockClipboard, noor, note, omar, renderApp } from './utils';
+
+vi.mock('@/lib/api', async (orig) => {
+  const real = await orig<typeof import('@/lib/api')>();
+  return { ...real, api: Object.fromEntries(Object.keys(real.api).map((k) => [k, vi.fn()])) };
+});
+const A = api as unknown as Record<keyof typeof api, ReturnType<typeof vi.fn>>;
+
+function signedIn(experiments = [exp()]) {
+  A.me.mockResolvedValue({ user: noor });
+  A.listExperiments.mockResolvedValue(experiments);
+  A.stats.mockResolvedValue(emptyStats);
+  A.notifications.mockResolvedValue({ unread_count: 0, items: [] });
+  A.recentCollaborators.mockResolvedValue([lina, omar]);
+  A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, demo_enabled: true, dev_tools: false });
+  A.insights.mockResolvedValue({ status: 'none', result: null, error: null, updated_at: null, ai_configured: false });
+}
+
+beforeEach(() => {
+  Object.values(A).forEach((f) => f.mockReset());
+});
+
+describe('sign in', () => {
+  it('shows the sign-in page when nobody is signed in', async () => {
+    A.me.mockRejectedValue(new ApiError(401, 'not signed in'));
+    renderApp('/');
+    expect(await screen.findByTestId('button-sign-in')).toBeInTheDocument();
+    expect(screen.queryByTestId('server-offline')).not.toBeInTheDocument();
+  });
+
+  it('tells the user when the backend is offline, and can retry', async () => {
+    A.me.mockRejectedValue(new ApiError(0, 'Cannot reach the MindTrace server. Is the backend running?'));
+    renderApp('/');
+    expect(await screen.findByTestId('server-offline')).toBeInTheDocument();
+    A.me.mockRejectedValue(new ApiError(401, 'x'));
+    await userEvent.click(screen.getByTestId('button-retry-server'));
+    await waitFor(() => expect(screen.queryByTestId('server-offline')).not.toBeInTheDocument());
+  });
+
+  it('shows the server message for a wrong password and does not enter', async () => {
+    A.me.mockRejectedValue(new ApiError(401, 'x'));
+    A.login.mockRejectedValue(new ApiError(401, 'wrong email or password'));
+    renderApp('/');
+    await userEvent.type(await screen.findByTestId('input-email'), 'a@b.co');
+    await userEvent.type(screen.getByTestId('input-password'), 'whatever1');
+    await userEvent.click(screen.getByTestId('button-sign-in'));
+    expect(await screen.findByTestId('auth-error')).toHaveTextContent('wrong email or password');
+    expect(screen.queryByTestId('experiments-grid')).not.toBeInTheDocument();
+  });
+
+  it('logs in and lands on the dashboard', async () => {
+    A.me.mockRejectedValueOnce(new ApiError(401, 'x'));
+    A.login.mockImplementation(async () => {
+      signedIn();
+      return { user: noor };
+    });
+    renderApp('/');
+    await userEvent.type(await screen.findByTestId('input-email'), 'noor@lab.com');
+    await userEvent.type(screen.getByTestId('input-password'), 'correct-horse-1');
+    await userEvent.click(screen.getByTestId('button-sign-in'));
+    expect(await screen.findByTestId('experiments-grid')).toBeInTheDocument();
+    expect(A.login).toHaveBeenCalledWith('noor@lab.com', 'correct-horse-1', true);
+  });
+
+  it('a private page redirects to sign-in when signed out', async () => {
+    A.me.mockRejectedValue(new ApiError(401, 'x'));
+    renderApp('/dashboard');
+    expect(await screen.findByTestId('button-sign-in')).toBeInTheDocument();
+  });
+});
+
+describe('header', () => {
+  it('has the three-dots trigger first, then theme, notifications and the avatar together', async () => {
+    signedIn();
+    renderApp();
+    const trigger = await screen.findByTestId('button-toggle-sidebar');
+    const header = trigger.closest('header')!;
+    const order = [...header.querySelectorAll('[data-testid]')].map((el) => el.getAttribute('data-testid'));
+    expect(order[0]).toBe('button-toggle-sidebar');
+    const i = (id: string) => order.indexOf(id);
+    expect(i('button-toggle-theme')).toBeGreaterThan(-1);
+    expect(i('button-notifications')).toBe(i('button-toggle-theme') + 1);
+    expect(i('avatar-user')).toBe(i('button-notifications') + 1);
+    // and the theme switch is no longer in the sidebar or the dashboard body
+    expect(within(screen.getByTestId('sidebar')).queryByTestId('button-toggle-theme')).toBeNull();
+    expect(document.querySelectorAll('[data-testid=button-toggle-theme]')).toHaveLength(1);
+  });
+
+  it('the three-dots trigger opens and closes the sidebar, and remembers it', async () => {
+    signedIn();
+    renderApp();
+    const trigger = await screen.findByTestId('button-toggle-sidebar');
+    const sidebar = screen.getByTestId('sidebar');
+    expect(sidebar).toHaveAttribute('data-state', 'open');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(trigger);
+    expect(sidebar).toHaveAttribute('data-state', 'closed');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(sidebar).toHaveAttribute('aria-hidden', 'true');
+    expect(JSON.parse(window.localStorage.getItem('mindtrace.prefs')!).sidebarCollapsed).toBe(true);
+    await userEvent.click(trigger);
+    expect(sidebar).toHaveAttribute('data-state', 'open');
+  });
+
+  it('the theme switch flips dark mode and remembers it', async () => {
+    signedIn();
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-toggle-theme'));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(JSON.parse(window.localStorage.getItem('mindtrace.prefs')!).theme).toBe('dark');
+    await userEvent.click(screen.getByTestId('button-toggle-theme'));
+    expect(document.documentElement).not.toHaveClass('dark');
+  });
+
+  it('the profile popover shows the user and a working Copy ID button', async () => {
+    signedIn();
+    const writeText = mockClipboard();
+    renderApp();
+    await userEvent.click(await screen.findByTestId('avatar-user'));
+    expect(await screen.findByTestId('profile-name')).toHaveTextContent('Dr. Noor Rahman');
+    expect(screen.getByTestId('profile-email')).toHaveTextContent('noor@lab.com');
+    expect(screen.getByTestId('profile-user-id')).toHaveTextContent('MT-NOOR2345');
+    await userEvent.click(screen.getByTestId('button-copy-user-id'));
+    expect(writeText).toHaveBeenCalledWith('MT-NOOR2345');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('Copy ID still works when the Clipboard API is blocked', async () => {
+    signedIn();
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true });
+    document.execCommand = vi.fn().mockReturnValue(true);
+    renderApp();
+    await userEvent.click(await screen.findByTestId('avatar-user'));
+    await userEvent.click(await screen.findByTestId('button-copy-user-id'));
+    expect(document.execCommand).toHaveBeenCalledWith('copy');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('signing out clears the session and returns to sign-in', async () => {
+    signedIn();
+    A.logout.mockResolvedValue({ ok: true });
+    renderApp();
+    await userEvent.click(await screen.findByTestId('avatar-user'));
+    await userEvent.click(await screen.findByTestId('button-sign-out'));
+    expect(await screen.findByTestId('button-sign-in')).toBeInTheDocument();
+  });
+});
+
+describe('dashboard metrics', () => {
+  it('has no Log Note button, no subtext under Avg. originality, and a dedicated Insights card', async () => {
+    signedIn();
+    renderApp();
+    await screen.findByTestId('experiments-grid');
+    expect(screen.queryByText(/log note/i)).toBeNull();
+    const orig = screen.getByTestId('metric-originality');
+    expect(orig).toHaveTextContent('Avg. originality');
+    expect(orig).toHaveTextContent('78%');
+    expect(orig.textContent).not.toMatch(/across all work/i);
+    expect(orig.querySelectorAll('span').length).toBe(1); // only the label: no note span
+    expect(screen.getByTestId('metric-notes')).toHaveTextContent('+2 from last week'); // other cards keep theirs
+    expect(screen.getByTestId('card-insights-summary')).toHaveTextContent('Insights');
+  });
+
+  it('the Insights card shows the latest AI summary and what needs review', async () => {
+    signedIn();
+    A.stats.mockResolvedValue({ ...emptyStats, insights: { experiments_analyzed: 2, notes_to_review: 3, avg_documentation_quality: 72, latest: { experiment_id: '1', title: 'T', summary: 'The drift repeats after 20 minutes.' } } });
+    renderApp();
+    expect(await screen.findByTestId('insights-quality')).toHaveTextContent('72%');
+    expect(screen.getByTestId('insights-latest')).toHaveTextContent('The drift repeats');
+    expect(screen.getByTestId('card-insights-summary')).toHaveTextContent('3 notes to review');
+  });
+});
+
+describe('experiment card', () => {
+  it('Complete and Paused buttons update the card at once and call the API', async () => {
+    signedIn();
+    let current = exp(); // a stateful fake server: it remembers the status like the real one
+    A.listExperiments.mockImplementation(async () => [current]);
+    A.setStatus.mockImplementation(async (id: string, status: string) => {
+      current = exp({ id, status: status as 'Active' });
+      return current;
+    });
+    renderApp();
+    const card = await screen.findByTestId('card-experiment-1');
+    expect(card).toHaveAttribute('data-status', 'Active');
+    await userEvent.click(screen.getByTestId('button-complete-1'));
+    await waitFor(() => expect(card).toHaveAttribute('data-status', 'Completed'));
+    expect(A.setStatus).toHaveBeenCalledWith('1', 'Completed');
+    expect(screen.getByTestId('button-complete-1')).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByTestId('button-pause-1'));
+    await waitFor(() => expect(card).toHaveAttribute('data-status', 'Paused'));
+    expect(A.setStatus).toHaveBeenLastCalledWith('1', 'Paused');
+    await userEvent.click(screen.getByTestId('button-pause-1')); // pressing the active one goes back to Active
+    await waitFor(() => expect(card).toHaveAttribute('data-status', 'Active'));
+    expect(A.setStatus).toHaveBeenLastCalledWith('1', 'Active');
+  });
+
+  it('snaps back and says so when the server refuses', async () => {
+    signedIn();
+    A.setStatus.mockRejectedValue(new ApiError(500, 'boom'));
+    renderApp();
+    const card = await screen.findByTestId('card-experiment-1');
+    await userEvent.click(screen.getByTestId('button-complete-1'));
+    expect(await screen.findByTestId('status-error')).toBeInTheDocument();
+    await waitFor(() => expect(card).toHaveAttribute('data-status', 'Active'));
+  });
+
+  it('every card has an Add people button that opens the modal', async () => {
+    signedIn([exp({ id: '1' }), exp({ id: '2', title: 'Second', code: 'EXP-2' })]);
+    renderApp();
+    await screen.findByTestId('card-experiment-2');
+    expect(screen.getByTestId('button-add-people-1')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('button-add-people-2'));
+    const dialog = await screen.findByTestId('dialog-add-people');
+    expect(dialog).toHaveTextContent('Second');
+  });
+});
+
+describe('add people', () => {
+  it('finds a person by email or ID and adds them', async () => {
+    signedIn();
+    A.searchUsers.mockResolvedValue([lina]);
+    A.addCollaborator.mockResolvedValue({ collaborator: lina, experiment: exp({ collaborators: [lina] }) });
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-add-people-1'));
+    await userEvent.type(await screen.findByTestId('input-people-search'), 'lina@lab.com');
+    const result = await screen.findByTestId(`result-${lina.id}`, undefined, { timeout: 3000 });
+    expect(A.searchUsers).toHaveBeenCalledWith('lina@lab.com');
+    await userEvent.click(within(result).getByTestId(`button-add-${lina.id}`));
+    await waitFor(() => expect(A.addCollaborator).toHaveBeenCalledWith('1', lina.id));
+    expect(await screen.findByTestId('people-success')).toBeInTheDocument();
+  });
+
+  it('says so when nobody matches', async () => {
+    signedIn();
+    A.searchUsers.mockResolvedValue([]);
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-add-people-1'));
+    await userEvent.type(await screen.findByTestId('input-people-search'), 'MT-ZZZZZZZZ');
+    expect(await screen.findByTestId('people-no-match', undefined, { timeout: 3000 })).toHaveTextContent('No user with that email or ID');
+  });
+
+  it('shows the server error when adding a stranger by typing the identifier', async () => {
+    signedIn();
+    A.searchUsers.mockResolvedValue([]);
+    A.addCollaborator.mockRejectedValue(new ApiError(404, 'no user with that email or ID'));
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-add-people-1'));
+    await userEvent.type(await screen.findByTestId('input-people-search'), 'nobody@lab.com');
+    await userEvent.click(screen.getByTestId('button-people-add-typed'));
+    expect(await screen.findByTestId('people-error')).toHaveTextContent('no user with that email or ID');
+  });
+
+  it('adds a recent collaborator with one click, and shows who already has access', async () => {
+    signedIn([exp({ collaborators: [omar] })]);
+    A.addCollaborator.mockResolvedValue({ collaborator: lina, experiment: exp({ collaborators: [omar, lina] }) });
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-add-people-1'));
+    expect(await screen.findByTestId(`recent-${omar.id}`)).toHaveTextContent('Added'); // already in: no button
+    expect(screen.queryByTestId(`button-add-${omar.id}`)).toBeNull();
+    await userEvent.click(await screen.findByTestId(`button-add-${lina.id}`));
+    await waitFor(() => expect(A.addCollaborator).toHaveBeenCalledWith('1', lina.id));
+    const access = screen.getByTestId('people-with-access');
+    expect(access).toHaveTextContent('Dr. Noor Rahman');
+    expect(access).toHaveTextContent('Omar Khalid');
+  });
+});
+
+describe('notifications', () => {
+  it('shows no alert for what was already there, then an alert and a badge for a new collaborator note', async () => {
+    signedIn();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      A.notifications.mockResolvedValue({ unread_count: 0, items: [] });
+      renderApp();
+      await screen.findByTestId('experiments-grid');
+      expect(screen.queryByTestId('badge-notifications')).toBeNull();
+      expect(screen.queryByTestId('toast-notification')).toBeNull();
+      A.notifications.mockResolvedValue({ unread_count: 1, items: [note({ id: 7 })] });
+      await vi.advanceTimersByTimeAsync(4500);
+      const toast = await screen.findByTestId('toast-notification');
+      expect(toast).toHaveTextContent('Dr. Lina Haddad added a note in Ambient temperature');
+      expect(screen.getByTestId('badge-notifications')).toHaveTextContent('1');
+      await vi.advanceTimersByTimeAsync(4500); // the same notification does not alert twice
+      expect(screen.getAllByTestId('toast-notification')).toHaveLength(1);
+      expect(A.listExperiments.mock.calls.length).toBeGreaterThan(1); // shared work was refreshed
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the bell lists notifications and "mark all read" clears the badge', async () => {
+    signedIn();
+    A.notifications.mockResolvedValue({ unread_count: 2, items: [note({ id: 2, kind: 'collaborator_added' }), note({ id: 1 })] });
+    A.markRead.mockImplementation(async () => {
+      A.notifications.mockResolvedValue({ unread_count: 0, items: [note({ id: 2, kind: 'collaborator_added', read: true }), note({ id: 1, read: true })] });
+      return { marked: 2 };
+    });
+    renderApp();
+    expect(await screen.findByTestId('badge-notifications')).toHaveTextContent('2');
+    await userEvent.click(screen.getByTestId('button-notifications'));
+    const pop = await screen.findByTestId('popover-notifications');
+    expect(pop).toHaveTextContent('Dr. Lina Haddad added you to Ambient temperature');
+    expect(pop).toHaveTextContent('Dr. Lina Haddad added a note in Ambient temperature');
+    await userEvent.click(screen.getByTestId('button-mark-all-read'));
+    await waitFor(() => expect(screen.queryByTestId('badge-notifications')).toBeNull());
+    expect(A.markRead).toHaveBeenCalledWith();
+  });
+
+  it('the local mock trigger raises an alert and a badge without any server', async () => {
+    signedIn();
+    renderApp('/settings');
+    await userEvent.click(await screen.findByTestId('button-mock-local'));
+    expect(await screen.findByTestId('toast-notification')).toHaveTextContent('added a note');
+    expect(screen.getByTestId('badge-notifications')).toHaveTextContent('1');
+    await userEvent.click(screen.getByTestId('button-dismiss-toast'));
+    expect(screen.queryByTestId('toast-notification')).toBeNull();
+    expect(screen.getByTestId('badge-notifications')).toHaveTextContent('1'); // dismissing the alert does not mark it read
+  });
+
+  it('the server mock trigger falls back to the local one when dev tools are off', async () => {
+    signedIn();
+    A.simulateCollaboratorNote.mockRejectedValue(new ApiError(404, 'not found'));
+    renderApp('/settings');
+    await userEvent.click(await screen.findByTestId('button-mock-server'));
+    expect(await screen.findByTestId('toast-notification')).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-result')).toHaveTextContent('local');
+  });
+});
+
+describe('experiment page', () => {
+  it('an unknown or foreign experiment is a clear "not found", never somebody else\'s data', async () => {
+    signedIn();
+    A.getExperiment.mockRejectedValue(new ApiError(404, 'no such experiment'));
+    renderApp('/experiments/999');
+    expect(await screen.findByTestId('experiment-missing')).toHaveTextContent('does not exist');
+  });
+
+  it('shows the Notes timeline wide, a compact Add note card, and the Insights card in the top metrics', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ notes: [{ id: 5, text: 'first note', kind: 'observation', source: 'manual', text_source: 'human', time_label: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true }] }));
+    renderApp('/experiments/1');
+    const metrics = await screen.findByTestId('experiment-metrics');
+    expect(within(metrics).getByTestId('card-insights-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('card-notes')).toHaveTextContent('first note');
+    const grid = screen.getByTestId('card-notes').parentElement!;
+    expect(grid.className).toMatch(/2\.1fr/); // notes column is the wide one
+    expect(grid.className).toMatch(/\.9fr/); // add-note column is the narrow one
+    expect(screen.getByTestId('card-add-note')).toBeInTheDocument();
+    expect(screen.queryByText(/log note/i)).toBeNull();
+  });
+
+  it('adding a note posts it and clears the box; an empty note cannot be saved', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.addNote.mockResolvedValue({});
+    renderApp('/experiments/1');
+    const box = await screen.findByTestId('textarea-new-note');
+    expect(screen.getByTestId('button-save-note')).toBeDisabled();
+    fireEvent.change(box, { target: { value: '  the colour changed  ' } });
+    await userEvent.click(screen.getByTestId('button-save-note'));
+    await waitFor(() => expect(A.addNote).toHaveBeenCalledWith('1', 'the colour changed'));
+    await waitFor(() => expect(box).toHaveValue(''));
+  });
+
+  it('a recorded note that needs review shows the second reading, and audio only when it exists', async () => {
+    signedIn();
+    const base = { kind: 'observation' as const, source: 'recording' as const, text_source: 'asr' as const, time_label: '00:25', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), author: noor, can_edit: true };
+    A.getExperiment.mockResolvedValue(exp({ notes: [
+      { ...base, id: 1, text: 'قاسنة تيم بريتشر', asr: { language: 'Arabic', confidence: 0.6, needs_review: true, language_rechecked: false, alternative: { engine: 'faster-whisper', model: 'turbo', text: 'جسنا التمبريتشر' } }, audio_file: 'notes/note_01.wav', has_audio: true },
+      { ...base, id: 2, text: 'no audio here', asr: null, audio_file: 'notes/note_02.wav', has_audio: false },
+    ] }));
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('note-review-1')).toBeInTheDocument();
+    expect(screen.getByTestId('note-alt-1')).toHaveTextContent('جسنا التمبريتشر');
+    expect(screen.getByTestId('audio-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('audio-2')).toBeNull();
+  });
+});
+
+describe('language', () => {
+  it('switches to Arabic: right-to-left, translated, and remembered', async () => {
+    signedIn();
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-toggle-language'));
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.lang).toBe('ar');
+    expect(await screen.findByText('التجارب الأخيرة')).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem('mindtrace.prefs')!).language).toBe('ar');
+  });
+});
