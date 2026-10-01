@@ -108,8 +108,9 @@ def note_audio(exp_id: str, note_id: int, request: Request, user=Depends(current
     ex.require(d, eid, user["id"])
     n = d.one("SELECT meta FROM notes WHERE id=? AND experiment_id=?", (note_id, eid))
     e = d.one("SELECT owner_id, session_id FROM experiments WHERE id=?", (eid,))
-    name = json.loads(n["meta"] or "{}").get("audio_file") if n else None
-    p = storage.audio_path(settings(request).audio_dir, e["owner_id"], e["session_id"] or "", name) if name and e["session_id"] else None
+    meta = json.loads(n["meta"] or "{}") if n else {}
+    name, sid = meta.get("audio_file"), meta.get("session_id") or e["session_id"]
+    p = storage.audio_path(settings(request).audio_dir, e["owner_id"], sid or "", name) if name and sid else None
     if p is None:
         raise HTTPException(404, "no audio for this note")
     return FileResponse(p, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})

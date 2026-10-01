@@ -56,23 +56,26 @@ def _people(db: Database, exp_id: int) -> list[dict]:
     return [public(r, include_email=False) for r in rows]
 
 
-def audio_files_of(db: Database, exp_id: int) -> set[str]:
-    """Names of the audio files stored for the recording this experiment came from (empty for hand-written ones)."""
-    row = db.one("""SELECT s.audio_files FROM experiments e JOIN sessions s ON s.owner_id=e.owner_id AND s.session_id=e.session_id
-                    WHERE e.id=?""", (exp_id,))
-    return set(json.loads(row["audio_files"])) if row else set()
+def audio_files_of(db: Database, exp_id: int) -> set[tuple[str, str]]:
+    """(session_id, file name) of every audio file stored for the recordings this experiment came from."""
+    out: set[tuple[str, str]] = set()
+    for r in db.all("""SELECT s.session_id, s.audio_files FROM sessions s JOIN experiments e ON e.owner_id=s.owner_id
+                       WHERE e.id=? AND s.experiment_id=e.id""", (exp_id,)):
+        out |= {(r["session_id"], f) for f in json.loads(r["audio_files"])}
+    return out
 
 
-def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: set[str] | None = None) -> dict:
+def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: set[tuple[str, str]] | None = None) -> dict:
     author = db.one("SELECT * FROM users WHERE id=?", (n["author_id"],))
     meta = json.loads(n["meta"] or "{}")
     if audio_files is None:
         audio_files = audio_files_of(db, n["experiment_id"])
+    first_session = (db.one("SELECT session_id FROM experiments WHERE id=?", (n["experiment_id"],)) or {"session_id": None})["session_id"]
     return {"id": n["id"], "text": n["text"], "kind": n["kind"], "source": n["source"], "text_source": n["text_source"],
             "time_label": n["time_label"], "created_at": n["created_at"], "updated_at": n["updated_at"],
             "author": public(author, include_email=False) if author else None,
             "asr": meta.get("asr"), "speaker_check": meta.get("speaker_check"), "audio_file": meta.get("audio_file"),
-            "has_audio": bool(meta.get("audio_file")) and meta.get("audio_file") in audio_files,
+            "has_audio": bool(meta.get("audio_file")) and (meta.get("session_id") or first_session, meta.get("audio_file")) in audio_files,
             "can_edit": n["author_id"] == user_id or owner_id == user_id}
 
 

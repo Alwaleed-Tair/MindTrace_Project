@@ -152,3 +152,51 @@ def test_session_list_pagination(app):
     r = u.get("/api/sessions?limit=2").json()
     assert r["total"] == 3 and [x["session_id"] for x in r["items"]] == ["s2", "s1"]
     assert u.get("/api/sessions?limit=0").status_code == 422
+
+
+def test_a_second_recording_with_the_same_title_continues_that_experiment(app):
+    u = new_client(app, "c@x.com")
+    h = token(u)
+    s1 = sample()
+    r1 = post(app, h, s1, [("files", ("notes/note_01.wav", make_wav(0.1), "audio/wav"))])
+    eid = r1.json()["experiment_id"]
+    n1 = len(u.get(f"/api/experiments/{eid}").json()["notes"])
+    s2 = sample()
+    s2["session_id"] = "2026-10-02_10-00-00"
+    s2["title"] = s1["title"].upper() + " ،"                                   # same words, different case/punctuation
+    s2["duration_sec"] = 30.0
+    s2["experiment_status"] = {"state": "ongoing", "source": "user", "answered_at": None}
+    r2 = post(app, h, s2, [("files", ("notes/note_01.wav", make_wav(0.3), "audio/wav"))])
+    assert r2.status_code == 201 and r2.json()["experiment_id"] == eid and r2.json()["updated_existing"] is False
+    items = u.get("/api/experiments").json()["items"]
+    assert len(items) == 1
+    exp = u.get(f"/api/experiments/{eid}").json()
+    assert len(exp["notes"]) == n1 * 2 and exp["status"] == "Active"
+    assert exp["session_id"] == s1["session_id"]
+    # each note plays the audio of ITS recording
+    played = [n for n in exp["notes"] if n["has_audio"]]
+    assert len(played) == 2
+    bodies = {u.get(f"/api/experiments/{eid}/notes/{n['id']}/audio").content for n in played}
+    assert len(bodies) == 2
+    # re-posting the second recording updates its own notes only
+    s2["notes"][4]["text"] = "نص جديد للتسجيل الثاني"
+    post(app, h, s2)
+    after = u.get(f"/api/experiments/{eid}").json()["notes"]
+    assert len(after) == n1 * 2 and sum(n["text"] == "نص جديد للتسجيل الثاني" for n in after) == 1
+
+
+def test_a_different_title_makes_a_new_experiment(app):
+    u = new_client(app, "d@x.com")
+    h = token(u)
+    post(app, h, sample())
+    s2 = sample()
+    s2["session_id"], s2["title"] = "2026-10-03_09-00-00", "تجربة مختلفة تماماً"
+    post(app, h, s2)
+    assert len(u.get("/api/experiments").json()["items"]) == 2
+
+
+def test_titles_never_merge_across_researchers(app):
+    a, b = new_client(app, "a2@x.com"), new_client(app, "b2@x.com")
+    post(app, token(a), sample())
+    post(app, token(b), sample())
+    assert len(a.get("/api/experiments").json()["items"]) == 1 and len(b.get("/api/experiments").json()["items"]) == 1

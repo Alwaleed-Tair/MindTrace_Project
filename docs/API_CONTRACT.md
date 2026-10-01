@@ -48,7 +48,7 @@
 1. `Content-Type: application/json` والجسم هو `session.json` كامل.
 2. `multipart/form-data`: الحقل `session` = ملف `session.json`، والحقل `files` (يتكرر) = ملفات WAV، **اسم الملف هو مساره داخل المجلد**: `notes/title.wav` و`notes/note_01.wav` و`full_session.wav`. أي اسم ثاني يُرفض (422).
 
-كل تسجيل = **تجربة** (experiment). العنوان المنطوق صار عنوان التجربة، وكل نوت صار نوت `source: "recording"` فيه `asr` (الثقة وقراءة Whisper الثانية) و`speaker_check`. إعادة رفع نفس `session_id` (بعد `--retranscribe`) **تحدّث** نفس التجربة: نوتس الـ ASR تأخذ النص الجديد، ونوت عدّله شخص يدوياً **ما يتغيّر أبداً**.
+كل تسجيل = **تجربة** (experiment)، **إلا لو العنوان المنطوق يطابق عنوان تجربة عندك** (بدون اعتبار للحروف الكبيرة والترقيم والتشكيل): وقتها التسجيل **يكمل نفس التجربة** (نوتس جديدة، المدة تتجمّع، والحالة تتحدّث من `experiment_status`). ما يصير دمج بين مستخدمين. العنوان المنطوق صار عنوان التجربة، وكل نوت صار نوت `source: "recording"` فيه `asr` (الثقة وقراءة Whisper الثانية) و`speaker_check`. إعادة رفع نفس `session_id` (بعد `--retranscribe`) **تحدّث** نفس التجربة: نوتس الـ ASR تأخذ النص الجديد، ونوت عدّله شخص يدوياً **ما يتغيّر أبداً**.
 
 الرد `201`: `{session_id, experiment_id, updated_existing, notes, audio_files, ai_status}`.
 
@@ -72,7 +72,7 @@
 ## مراجعة DeepSeek
 `ai.status`: `none` · `disabled` (ما في مفتاح) · `queued` · `running` · `done` · `failed` (مع `error`). النتيجة:
 ```json
-{"summary":"...","documentation_quality":{"score":45,"strengths":["..."],"gaps":["..."]},
+{"summary":"ملخص كامل للتجربة (6-10 جمل من الوصف والنوتس)","key_points":["..."],"next_steps":["..."],"documentation_quality":{"score":45,"strengths":["..."],"gaps":["..."]},
  "novelty":{"score":30,"rationale":"...","caveat":"تقدير من النموذج بدون بحث في الأدبيات"},
  "note_suggestions":[{"note_id":3,"suggested_text":"...","reason":"...","confidence":"medium"}],
  "notes_to_review":[3],"note_kinds":[{"note_id":3,"kind":"hypothesis"}],"meta":{"model":"deepseek-chat","attempts":1}}

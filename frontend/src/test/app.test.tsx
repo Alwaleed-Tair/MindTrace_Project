@@ -161,7 +161,8 @@ describe('dashboard metrics', () => {
     expect(orig).toHaveTextContent('78%');
     expect(orig.textContent).not.toMatch(/across all work/i);
     expect(orig.querySelectorAll('span').length).toBe(1); // only the label: no note span
-    expect(screen.getByTestId('metric-notes')).toHaveTextContent('+2 from last week'); // other cards keep theirs
+    expect(screen.queryByTestId('metric-notes')).toBeNull(); // the weekly notes card was removed
+    expect(screen.queryByTestId('link-nav-experiments')).toBeNull(); // so was the sidebar Experiments button
     expect(screen.getByTestId('card-insights-summary')).toHaveTextContent('Insights');
   });
 

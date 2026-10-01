@@ -1,4 +1,4 @@
-import { ArrowDownAZ, ChevronDown, FileText, FlaskConical, Lightbulb, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownAZ, ChevronDown, FlaskConical, Lightbulb, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { CreateExperimentDialog } from '@/components/dashboard/CreateExperimentDialog';
@@ -27,7 +27,6 @@ export default function DashboardPage() {
   const create = useCreateExperiment();
 
   const items = experiments.data ?? [];
-  const delta = (stats.data?.notes_this_week ?? 0) - (stats.data?.notes_last_week ?? 0);
   const greetName = greetingName(user?.name ?? '');
 
   return (
@@ -44,9 +43,8 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-5" data-testid="metrics">
+      <div className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="metrics">
         <MetricCard testId="metric-active" icon={FlaskConical} label={t.activeThreads} value={String(stats.data?.active_threads ?? 0).padStart(2, '0')} note={t.inMotion} delay={1} />
-        <MetricCard testId="metric-notes" icon={FileText} label={t.notesWeek} value={String(stats.data?.notes_this_week ?? 0)} note={fill(t.notesDelta, { n: `${delta >= 0 ? '+' : ''}${delta}` })} delay={2} />
         {/* no subtext under this one, on purpose */}
         <MetricCard testId="metric-originality" icon={Lightbulb} label={t.avgOriginality} value={`${stats.data?.avg_originality ?? 0}%`} delay={3} />
         <InsightsMetricCard stats={stats.data} />

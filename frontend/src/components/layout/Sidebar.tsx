@@ -1,4 +1,4 @@
-import { CircleHelp, FlaskConical, LayoutDashboard, Settings, X } from 'lucide-react';
+import { CircleHelp, LayoutDashboard, Settings, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { Logo } from '@/components/common/Logo';
 import { useAuth } from '@/context/AuthContext';
@@ -14,7 +14,6 @@ export function Sidebar() {
   const rtl = dir === 'rtl';
   const nav = [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, id: 'dashboard' },
-    { href: '/dashboard', label: t.experiments, icon: FlaskConical, id: 'experiments' },
   ];
   const slide = mobileNavOpen ? 'translate-x-0' : rtl ? 'translate-x-full' : '-translate-x-full';
   return (

@@ -6,7 +6,7 @@ import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
 import { MetricCard } from '@/components/dashboard/MetricCards';
 import { StatusActions } from '@/components/dashboard/StatusActions';
 import { AddNoteCard } from '@/components/experiment/AddNoteCard';
-import { InsightsSummaryCard, InsightsTab, OriginalityCard, SimilarCard } from '@/components/experiment/InsightsPanels';
+import { InsightsSummaryCard, InsightsTab, OriginalityCard } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -117,7 +117,6 @@ function Detail({ experiment }: { experiment: Experiment }) {
             <aside className="space-y-5">
               <AddNoteCard experimentId={experiment.id} />
               <OriginalityCard experiment={experiment} />
-              <SimilarCard />
             </aside>
           </div>
         </>

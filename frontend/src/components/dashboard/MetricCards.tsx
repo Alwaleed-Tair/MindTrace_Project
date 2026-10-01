@@ -45,7 +45,7 @@ export function InsightsMetricCard({ stats }: { stats: Stats | undefined }) {
             <span className="mb-1 text-[10px] text-muted-foreground">{t.insightsQuality}</span>
             {ins.notes_to_review > 0 && <span className="mb-1 ms-auto rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">{fill(t.insightsReview, { n: ins.notes_to_review })}</span>}
           </div>
-          <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground" data-testid="insights-latest">{ins.latest.summary}</p>
+          <p className="mt-2 line-clamp-4 text-xs leading-5 text-muted-foreground" data-testid="insights-latest">{ins.latest.summary}</p>
         </div>
       ) : (
         <p className="mt-4 text-xs leading-5 text-muted-foreground" data-testid="insights-empty">{t.insightsNone}</p>

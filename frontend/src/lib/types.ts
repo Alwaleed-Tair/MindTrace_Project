@@ -73,6 +73,8 @@ export interface Stats {
 
 export interface InsightsResult {
   summary: string;
+  key_points?: string[];
+  next_steps?: string[];
   documentation_quality: { score: number; strengths: string[]; gaps: string[] };
   novelty: { score: number; rationale: string; caveat: string };
   note_suggestions: { note_id: number; suggested_text: string; reason: string; confidence: string }[];

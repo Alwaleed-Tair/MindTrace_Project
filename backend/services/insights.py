@@ -22,7 +22,7 @@ def build_input(db: Database, exp_id: int) -> dict:
         meta = json.loads(n["meta"] or "{}")
         notes.append({"id": n["id"], "kind": n["kind"], "time_label": n["time_label"] or n["created_at"][11:16], "text": n["text"],
                       "asr": meta.get("asr"), "speaker_check": meta.get("speaker_check")})
-    return {"title": e["title"], "notes": notes, "duration_sec": e["duration_sec"],
+    return {"title": e["title"], "description": e["summary"], "notes": notes, "duration_sec": e["duration_sec"],
             "experiment_status": {"state": {"Active": "ongoing", "Paused": "paused_will_resume", "Completed": "completed"}[e["status"]]}}
 
 
