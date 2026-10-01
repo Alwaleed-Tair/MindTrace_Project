@@ -11,6 +11,9 @@ remembers what it sent, so a session is uploaded once, and again only if session
     python mindtrace_bridge.py --url http://host:8000 --sessions-dir ..\\MindTrace2\\sessions
 
 It never modifies or deletes anything in the sessions folder. Failures are retried on the next round.
+
+Login: an API token of YOUR platform account. Create it in the web app (Settings -> Laptop bridge token) or with
+`python backend/manage.py create-token you@lab.com`, then set it once:   $env:MINDTRACE_API_TOKEN = "mt_..."
 """
 from __future__ import annotations
 
@@ -75,9 +78,9 @@ def audio_parts(folder: Path, with_full: bool) -> list[Path]:
     return files
 
 
-def upload(client: httpx.Client, base_url: str, folder: Path, with_full: bool, api_key: str = "") -> dict:
+def upload(client: httpx.Client, base_url: str, folder: Path, with_full: bool, token: str = "") -> dict:
     """POST one session. Raises httpx.HTTPError / RuntimeError on failure."""
-    headers = {"X-API-Key": api_key} if api_key else {}
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     handles = []
     try:
         files = [("session", ("session.json", (folder / "session.json").read_bytes(), "application/json"))]
@@ -95,7 +98,7 @@ def upload(client: httpx.Client, base_url: str, folder: Path, with_full: bool, a
     return r.json()
 
 
-def run_once(client: httpx.Client, base_url: str, sessions_dir: Path, state: dict, with_full: bool, api_key: str,
+def run_once(client: httpx.Client, base_url: str, sessions_dir: Path, state: dict, with_full: bool, token: str,
              dry_run: bool = False, say=print) -> tuple[int, int]:
     sent = failed = 0
     for folder in find_sessions(sessions_dir):
@@ -106,7 +109,7 @@ def run_once(client: httpx.Client, base_url: str, sessions_dir: Path, state: dic
             say(f"would upload {folder.name} ({len(audio_parts(folder, with_full))} audio files)")
             continue
         try:
-            res = upload(client, base_url, folder, with_full, api_key)
+            res = upload(client, base_url, folder, with_full, token)
         except (httpx.HTTPError, RuntimeError, OSError) as exc:
             failed += 1
             say(f"! {folder.name}: not uploaded ({exc.__class__.__name__}: {str(exc)[:200]}). Will retry.")
@@ -128,7 +131,7 @@ def main(argv=None) -> int:
     ap.add_argument("--interval", type=float, default=cfg("WATCH_INTERVAL_SEC", 20))
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
-    api_key = os.environ.get("MINDTRACE_API_KEY", "")
+    token = os.environ.get("MINDTRACE_API_TOKEN", "")
     sessions_dir = Path(a.sessions_dir)
     if not sessions_dir.is_dir():
         print(f"Sessions folder not found: {sessions_dir}  (use --sessions-dir)", file=sys.stderr)
@@ -138,17 +141,17 @@ def main(argv=None) -> int:
     with httpx.Client() as client:
         try:
             h = client.get(a.url.rstrip("/") + "/api/health", timeout=10).json()
-            print(f"Platform {a.url}: OK (AI {'on' if h.get('ai_configured') else 'off'}, key {'required' if h.get('auth_required') else 'not required'})")
-            if h.get("auth_required") and not api_key:
-                print("The platform wants an API key: set the MINDTRACE_API_KEY environment variable.", file=sys.stderr)
-                return 2
+            print(f"Platform {a.url}: OK (AI {'on' if h.get('ai_configured') else 'off'})")
         except (httpx.HTTPError, ValueError) as exc:
             if not a.dry_run:
                 print(f"Cannot reach the platform at {a.url} ({exc.__class__.__name__}). Is the backend running?", file=sys.stderr)
                 if not a.watch:
                     return 1
+        if not token and not a.dry_run:
+            print("No API token. Create one in the web app (Settings -> Laptop bridge token) and set MINDTRACE_API_TOKEN.", file=sys.stderr)
+            return 2
         while True:
-            sent, failed = run_once(client, a.url, sessions_dir, state, with_full, api_key, a.dry_run)
+            sent, failed = run_once(client, a.url, sessions_dir, state, with_full, token, a.dry_run)
             if sent:
                 save_state(state)
             if not a.watch:

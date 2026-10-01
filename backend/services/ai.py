@@ -53,12 +53,18 @@ class Suggestion(BaseModel):
         return str(v)[:MAX_SUGGESTED_TEXT]
 
 
+class NoteKind(BaseModel):
+    note_id: int
+    kind: str
+
+
 class AiResult(BaseModel):
     summary: str
     documentation_quality: Quality
     novelty: Novelty
     note_suggestions: list[Suggestion] = Field(default_factory=list)
     notes_to_review: list[int] = Field(default_factory=list)
+    note_kinds: list[NoteKind] = Field(default_factory=list)
 
 
 class AiError(Exception):
@@ -86,7 +92,10 @@ Return ONLY one JSON object, no other text, with exactly these keys:
     note's flags.alternative_text (a second speech-to-text reading) to propose the most likely intended text. Keep the
     researcher's wording and dialect; write English technical terms in Latin letters. Do not invent facts or numbers.
     If you cannot tell, leave the note out),
- "notes_to_review": [integer note ids a human should listen to]
+ "notes_to_review": [integer note ids a human should listen to],
+ "note_kinds": [{"note_id": integer, "kind": "observation"|"hypothesis"|"decision"}]
+   (a label for every note: observation = something seen or measured, hypothesis = a guess or explanation to test,
+    decision = a choice about what to do next)
 }
 Write summary, strengths, gaps, rationale and caveat in __LANG__. Never invent measurements that are not in the notes."""
 
@@ -139,6 +148,7 @@ def parse_result(content: str, valid_note_ids: set[int]) -> dict:
     # suggestions only for notes that exist; ids that do not exist are dropped
     res.note_suggestions = [s for s in res.note_suggestions if s.note_id in valid_note_ids and s.suggested_text.strip()]
     res.notes_to_review = sorted({i for i in res.notes_to_review if i in valid_note_ids})
+    res.note_kinds = [k for k in res.note_kinds if k.note_id in valid_note_ids and k.kind in ("observation", "hypothesis", "decision")]
     return res.model_dump()
 
 
