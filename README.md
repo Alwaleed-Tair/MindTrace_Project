@@ -36,11 +36,13 @@ npm run build
 
 # 3) شغّل
 cd ..\backend
-uvicorn main:app --port 8000
+python -m uvicorn main:app --port 8000
 ```
 افتح **http://localhost:8000** ← اضغط **Open demo workspace**، أو سجّل بـ `demo@mindtrace.app` وكلمة المرور `MindTrace-Demo-2026` (للتجربة المحلية فقط)، أو أنشئ حسابك.
 
-**وضع التطوير** (تعديل الواجهة مباشرة): نافذة `uvicorn main:app --port 8000 --reload` ونافذة `cd frontend; npm run dev` ثم **http://localhost:3000** (يمرّر `/api` للخادم).
+> لو ظهر لك `uvicorn is not recognized` (يصير مع بايثون من Microsoft Store لأن مجلد Scripts مو في PATH) استخدم `python -m uvicorn` كما فوق، فهو يشتغل دائماً.
+
+**وضع التطوير** (تعديل الواجهة مباشرة): نافذة `python -m uvicorn main:app --port 8000 --reload` ونافذة `cd frontend; npm run dev` ثم **http://localhost:3000** (يمرّر `/api` للخادم).
 
 ## DeepSeek
 المفتاح في `backend/.env` فقط (الملف في `.gitignore`)، ويُستدعى من الخادم، **ما يوصل المتصفح**:
