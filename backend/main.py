@@ -1,143 +1,88 @@
-"""MindTrace platform backend: takes the laptop app's session.json (+ audio) as INPUT, stores it, serves it back
-for the web UI, and asks DeepSeek for a review. Run:  uvicorn main:app --port 8000   (see ../README.md)."""
+"""MindTrace platform backend.
+
+  * accounts (register / login / logout, scrypt passwords, HttpOnly cookie sessions, API tokens for the laptop bridge)
+  * experiments, notes, collaborators, notifications, stats (what the web UI shows)
+  * INPUT from the recorder: POST /api/sessions takes a session.json (+ audio) and turns it into an experiment
+  * DeepSeek insights, called from here only (the key never reaches the browser)
+  * serves the built frontend (../frontend/dist) so one process is the whole app
+
+Run:  uvicorn main:app --port 8000      (see ../README.md)
+"""
 from __future__ import annotations
 
-import json
-import secrets
-from pathlib import Path
-
 import httpx
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import ValidationError
-from starlette.datastructures import UploadFile as StarletteUploadFile
+from fastapi.responses import FileResponse, JSONResponse
 
+from api import auth, experiments, misc, sessions
 from core.config import Settings
+from core.env import load_env
 from core.db import Database
-from schemas.session import SessionIn
-from services import ai as ai_service
-from services import sessions as repo
-from services import storage
+from services import experiments as ex
+from services import users as users_service
 
-API_VERSION = "1.0.0"
+API_VERSION = "2.0.0"
+load_env()                      # DEEPSEEK_API_KEY etc. from backend/.env or the repository .env (never committed)
 
 
 def create_app(settings: Settings | None = None, ai_client: httpx.Client | None = None) -> FastAPI:
     st = settings or Settings()
     st.data_dir.mkdir(parents=True, exist_ok=True)
     db = Database(st.db_path)
-    app = FastAPI(title="MindTrace platform API", version=API_VERSION)
-    app.state.settings, app.state.db = st, db
-    app.add_middleware(CORSMiddleware, allow_origins=st.cors_origins, allow_methods=["GET", "POST"],
-                       allow_headers=["Content-Type", "X-API-Key"])
+    users_service.purge_expired(db)
+    app = FastAPI(title="MindTrace platform API", version=API_VERSION, docs_url="/api/docs", openapi_url="/api/openapi.json")
+    app.state.settings, app.state.db, app.state.ai_client, app.state.login_fails = st, db, ai_client, {}
+    app.add_middleware(CORSMiddleware, allow_origins=st.cors_origins, allow_credentials=True,
+                       allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
 
-    def require_key(x_api_key: str | None = Header(default=None)) -> None:
-        if st.api_key and not (x_api_key and secrets.compare_digest(x_api_key, st.api_key)):
-            raise HTTPException(401, "missing or wrong X-API-Key")
+    # ---- clear, consistent errors: {"detail": "..."} with the right status code
+    @app.exception_handler(ex.NotFound)
+    async def _nf(_r: Request, exc: ex.NotFound):
+        return JSONResponse({"detail": str(exc)}, status_code=404)
 
-    # ------------------------------------------------------------ background AI
-    def run_ai(session_id: str) -> None:
-        row = repo.get_session(db, session_id)
-        if row is None:
-            return
-        stamp = row["updated_at"]
-        repo.set_ai(db, session_id, "running")
-        try:
-            result = ai_service.analyze(st, row["session"], ai_client)
-        except ai_service.AiError as exc:
-            repo.set_ai(db, session_id, "failed", error=str(exc))
-            return
-        except Exception as exc:                                    # never leave a session stuck on "running"
-            repo.set_ai(db, session_id, "failed", error=f"unexpected error: {exc.__class__.__name__}")
-            return
-        now = repo.get_session(db, session_id)
-        if now is None or now["updated_at"] != stamp:              # the session was re-posted meanwhile: that run will redo it
-            return
-        repo.set_ai(db, session_id, "done", result=result)
+    @app.exception_handler(ex.Forbidden)
+    async def _fb(_r: Request, exc: ex.Forbidden):
+        return JSONResponse({"detail": str(exc)}, status_code=403)
 
-    # ------------------------------------------------------------------ routes
+    @app.exception_handler(ex.Invalid)
+    async def _iv(_r: Request, exc: ex.Invalid):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(RequestValidationError)
+    async def _val(_r: Request, exc: RequestValidationError):
+        errs = exc.errors()
+        msg = "; ".join(f"{'.'.join(str(p) for p in e['loc'] if p != 'body')}: {e['msg']}" for e in errs[:4])
+        return JSONResponse({"detail": msg or "invalid request", "errors": [{"field": ".".join(str(p) for p in e["loc"]), "problem": e["msg"]} for e in errs[:10]]},
+                            status_code=422)
+
     @app.get("/api/health")
     def health():
-        return {"ok": True, "version": API_VERSION, "schema_version": 1, "ai_configured": st.ai_configured,
-                "auth_required": bool(st.api_key)}
-
-    @app.post("/api/sessions", status_code=201, dependencies=[Depends(require_key)])
-    async def post_session(request: Request, background: BackgroundTasks):
-        """INPUT of the platform. Either  Content-Type: application/json  (the session.json as body), or
-        multipart/form-data with the field `session` (session.json) and any number of `files` (WAV, filename =
-        its path inside the session folder: notes/note_01.wav, notes/title.wav, full_session.wav)."""
-        length = request.headers.get("content-length")
-        if length and length.isdigit() and int(length) > st.max_upload_mb * 1024 * 1024:
-            raise HTTPException(413, f"upload larger than {st.max_upload_mb} MB")
-        ctype = request.headers.get("content-type", "")
-        uploads: list[tuple[str, bytes]] = []
-        if ctype.startswith("multipart/form-data"):
-            form = await request.form()
-            part = form.get("session")
-            if part is None:
-                raise HTTPException(422, "multipart upload needs a 'session' field with the session.json")
-            raw_bytes = await part.read() if isinstance(part, StarletteUploadFile) else str(part).encode("utf-8")
-            for key, value in form.multi_items():
-                if key == "files" and isinstance(value, StarletteUploadFile):
-                    uploads.append((value.filename or "", await value.read()))
-        else:
-            raw_bytes = await request.body()
+        ok_db = True
         try:
-            raw = json.loads(raw_bytes.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise HTTPException(422, f"the session is not valid JSON: {exc}") from exc
-        if not isinstance(raw, dict):
-            raise HTTPException(422, "the session must be a JSON object")
-        try:
-            s = SessionIn.model_validate(raw)
-        except ValidationError as exc:
-            raise HTTPException(422, [{"field": ".".join(map(str, e["loc"])), "problem": e["msg"]} for e in exc.errors()[:10]]) from exc
-        try:
-            for name, data in uploads:
-                storage.save_audio(st.audio_dir, s.session_id, name, data)
-        except storage.BadAudioName as exc:
-            raise HTTPException(422, str(exc)) from exc
-        files = storage.list_audio(st.audio_dir, s.session_id)
-        existed = repo.upsert(db, raw, s, files)
-        if st.ai_configured and st.ai_auto:
-            repo.set_ai(db, s.session_id, "queued")
-            background.add_task(run_ai, s.session_id)
-            ai_status = "queued"
-        else:
-            ai_status = "pending" if st.ai_configured else "disabled"
-            repo.set_ai(db, s.session_id, ai_status, error=None if st.ai_configured else "DEEPSEEK_API_KEY is not set")
-        return {"session_id": s.session_id, "updated_existing": existed, "notes": len(s.notes), "audio_files": files,
-                "ai_status": ai_status}
+            db.one("SELECT 1")
+        except Exception:
+            ok_db = False
+        return {"ok": ok_db, "version": API_VERSION, "ai_configured": st.ai_configured, "demo_enabled": st.demo_enabled,
+                "dev_tools": st.dev_tools}
 
-    @app.get("/api/sessions", dependencies=[Depends(require_key)])
-    def list_sessions(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)):
-        total, items = repo.list_sessions(db, limit, offset)
-        return {"total": total, "limit": limit, "offset": offset, "items": items}
+    for r in (auth.router, experiments.router, misc.router, sessions.router):
+        app.include_router(r)
 
-    @app.get("/api/sessions/{session_id}", dependencies=[Depends(require_key)])
-    def get_session(session_id: str):
-        row = repo.get_session(db, session_id)
-        if row is None:
-            raise HTTPException(404, "no such session")
-        return row
+    @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+    def _api_404(rest: str):
+        raise HTTPException(404, "not found")
 
-    @app.get("/api/sessions/{session_id}/audio/{name:path}", dependencies=[Depends(require_key)])
-    def get_audio(session_id: str, name: str):
-        p = storage.audio_path(st.audio_dir, session_id, name) if repo.get_session(db, session_id) else None
-        if p is None:
-            raise HTTPException(404, "no such audio file")
-        return FileResponse(p, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
-
-    @app.post("/api/sessions/{session_id}/analyze", status_code=202, dependencies=[Depends(require_key)])
-    def analyze(session_id: str, background: BackgroundTasks):
-        if repo.get_session(db, session_id) is None:
-            raise HTTPException(404, "no such session")
-        if not st.ai_configured:
-            raise HTTPException(503, "DEEPSEEK_API_KEY is not set on the server")
-        repo.set_ai(db, session_id, "queued")
-        background.add_task(run_ai, session_id)
-        return {"session_id": session_id, "ai_status": "queued"}
+    # ---- the built web UI (npm run build in ../frontend), single-page-app fallback
+    dist = st.frontend_dir.resolve()
+    if (dist / "index.html").is_file():
+        @app.get("/{path:path}", include_in_schema=False)
+        def _spa(path: str):
+            target = (dist / path).resolve()
+            if path and target.is_file() and dist in target.parents:
+                return FileResponse(target)
+            return FileResponse(dist / "index.html")
 
     return app
 

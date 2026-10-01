@@ -1,22 +1,18 @@
-# docker compose up --build        -> backend on http://localhost:8000 (data in ./data)
-# The web UI (frontend/, by Omar) has its own Dockerfile: docker compose --profile frontend up --build
+# docker compose up --build        -> the whole app (UI + API) on http://localhost:8000, data in the "mindtrace-data" volume
+# First time only, to get the demo workspace:   docker compose run --rm app python seed.py
 services:
-  backend:
-    build: ./backend
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
       - path: .env
         required: false
     environment:
       MINDTRACE_DATA_DIR: /data
     volumes:
-      - ./data:/data
+      - mindtrace-data:/data
     ports:
       - "8000:8000"
-  frontend:
-    profiles: ["frontend"]
-    build: ./frontend
-    depends_on: [backend]
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    ports:
-      - "3000:3000"
+volumes:
+  mindtrace-data:

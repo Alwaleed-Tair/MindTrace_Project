@@ -4,4 +4,4 @@ PLATFORM_URL = "http://localhost:8000"          # where the backend runs
 SESSIONS_DIR = r"..\MindTrace2\sessions"         # the laptop app's sessions folder (MindTrace2/sessions)
 UPLOAD_FULL_RECORDING = True                    # also upload full_session.wav (big: ~1 MB per 30 s)
 WATCH_INTERVAL_SEC = 20                         # --watch: look for new sessions this often
-# API key: set the environment variable MINDTRACE_API_KEY (same value as on the server) instead of writing it here.
+# The API token: set the environment variable MINDTRACE_API_TOKEN (create it in the web app, Settings) instead of writing it here.

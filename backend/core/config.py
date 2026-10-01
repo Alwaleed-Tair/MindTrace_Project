@@ -14,15 +14,21 @@ def _flag(name: str, default: bool) -> bool:
 @dataclass
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("MINDTRACE_DATA_DIR", "./data")))
-    api_key: str = field(default_factory=lambda: os.environ.get("MINDTRACE_API_KEY", ""))      # empty = no auth (local prototype)
     cors_origins: list[str] = field(default_factory=lambda: [
         o.strip() for o in os.environ.get("MINDTRACE_CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()])
+    env: str = field(default_factory=lambda: os.environ.get("MINDTRACE_ENV", "development"))
+    cookie_secure: bool = field(default_factory=lambda: _flag("MINDTRACE_COOKIE_SECURE", False))    # true when served over https
+    session_days: int = field(default_factory=lambda: int(os.environ.get("MINDTRACE_SESSION_DAYS", "30")))
+    demo_enabled: bool = field(default_factory=lambda: _flag("MINDTRACE_DEMO_ENABLED", True))       # "Open demo workspace" button
+    dev_tools: bool = field(default_factory=lambda: _flag("MINDTRACE_DEV_TOOLS", False))            # mock collaborator endpoints
+    frontend_dir: Path = field(default_factory=lambda: Path(os.environ.get("MINDTRACE_FRONTEND_DIR", "../frontend/dist")))
     max_upload_mb: int = field(default_factory=lambda: int(os.environ.get("MINDTRACE_MAX_UPLOAD_MB", "300")))
     # DeepSeek (OpenAI-compatible chat API). Only transcript TEXT is sent, never audio.
     deepseek_api_key: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_API_KEY", ""))
     deepseek_base_url: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
     deepseek_model: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"))
     ai_auto: bool = field(default_factory=lambda: _flag("MINDTRACE_AI_AUTO", True))             # analyse right after a session arrives
+    literature_enabled: bool = field(default_factory=lambda: _flag("MINDTRACE_LITERATURE", True))   # originality: search scholarly sources
     ai_timeout_sec: float = field(default_factory=lambda: float(os.environ.get("MINDTRACE_AI_TIMEOUT_SEC", "90")))
     ai_language: str = field(default_factory=lambda: os.environ.get("MINDTRACE_AI_LANGUAGE", "Arabic"))
 

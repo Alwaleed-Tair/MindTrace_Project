@@ -1,102 +1,83 @@
-# عقد الواجهة (API Contract)
+# عقد الواجهة (API Contract) · v2
 
-هذا هو الاتفاق بين أجزاء المنصة. **الـ `session.json` هو المدخل.** الواجهة (عمر) تقرأ من `GET` فقط.
+الأساس: `http://<host>:8000`، كل المسارات تحت `/api`. الواجهة والـ API يقدّمهم نفس الخادم، فالـ cookie يشتغل بدون إعدادات.
+الأخطاء كلها بهذا الشكل: `{"detail": "رسالة واضحة"}` مع كود HTTP مناسب (401 غير مسجّل، 403 ممنوع، 404 غير موجود أو ليس لك، 409 مكرر، 422 مدخل غلط، 429 محاولات كثيرة، 503 الخدمة غير مفعّلة).
 
-الأساس: `http://<host>:8000`. كل المسارات تحت `/api`. لو الخادم عنده `MINDTRACE_API_KEY` لازم الهيدر `X-API-Key: <المفتاح>` على كل شي ما عدا `/api/health`.
+## المصادقة
+- **الواجهة (متصفح):** cookie اسمه `mt_session` (HttpOnly، SameSite=Lax). كل طلب كتابة (`POST/PATCH/DELETE`) لازم يحمل الهيدر `X-Requested-With: mindtrace` (حماية CSRF).
+- **الجسر (laptop bridge):** `Authorization: Bearer mt_...` (token ينشئه المستخدم من Settings). ما يحتاج الهيدر الثاني.
+- كلمات المرور تُخزَّن مشفّرة (scrypt). 5 محاولات دخول خاطئة تُوقف الحساب 5 دقائق (429).
+- مستخدم **لا يرى ولا يعدّل** تجارب غيره: أي تجربة ليست له ترجع `404` (نفس جواب "غير موجودة").
 
-## المدخل: `POST /api/sessions`  (من الجسر `bridge/`)
+## جدول الـ endpoints
 
+| Method | Endpoint | الغرض | Auth |
+|---|---|---|---|
+| GET | `/api/health` | حالة الخادم، هل DeepSeek مفعّل، هل الديمو متاح | لا |
+| POST | `/api/auth/register` | حساب جديد `{name,email,password(≥8),lab?}` ويدخل مباشرة | لا |
+| POST | `/api/auth/login` | `{email,password,remember}` | لا |
+| POST | `/api/auth/demo` | فتح مساحة العرض (بعد `python seed.py`) | لا |
+| POST | `/api/auth/logout` | | نعم |
+| GET | `/api/auth/me` | المستخدم الحالي (فيه `id` الفريد `MT-XXXXXXXX`) | نعم |
+| POST | `/api/auth/api-token` | token للجسر (يظهر مرة وحدة، يُخزَّن hash فقط) | cookie |
+| GET | `/api/stats` | أرقام لوحة التحكم + ملخص الرؤى | نعم |
+| GET | `/api/experiments?status=&q=&sort=` | تجاربي والمشاركة معي | نعم |
+| POST | `/api/experiments` | `{title,summary?,tags?}` | نعم |
+| GET | `/api/experiments/{id}` | التجربة + النوتس + المتعاونون | نعم |
+| PATCH | `/api/experiments/{id}` | `{status}` (أي عضو) أو `{title,summary,tags}` (المالك) | نعم |
+| DELETE | `/api/experiments/{id}` | المالك فقط | نعم |
+| POST | `/api/experiments/{id}/notes` | `{text,kind?}` | نعم |
+| PATCH | `/api/notes/{id}` | `{text?,kind?}` الكاتب أو المالك | نعم |
+| DELETE | `/api/notes/{id}` | الكاتب أو المالك | نعم |
+| GET | `/api/experiments/{id}/notes/{noteId}/audio` | صوت النوت المسجّل (wav) | نعم |
+| GET | `/api/users/search?q=` | مطابقة **تامة** لبريد أو ID (ما في تصفح للمستخدمين) | نعم |
+| GET | `/api/collaborators/recent` | آخر من أضفتهم | نعم |
+| POST | `/api/experiments/{id}/collaborators` | `{identifier}` بريد أو `MT-XXXXXXXX` | نعم |
+| DELETE | `/api/experiments/{id}/collaborators/{userId}` | المالك فقط | نعم |
+| GET | `/api/notifications?unread=&limit=` | `{unread_count, items}` | نعم |
+| POST | `/api/notifications/read` | `{ids?}` بدون ids = الكل | نعم |
+| GET | `/api/experiments/{id}/insights` | حالة ونتيجة مراجعة DeepSeek | نعم |
+| POST | `/api/experiments/{id}/insights` | تشغيل المراجعة (202). `503` لو ما في مفتاح | نعم |
+| **POST** | **`/api/sessions`** | **المدخل: `session.json` (+ الصوت) من برنامج اللابتوب** | token أو cookie |
+| GET | `/api/sessions`, `/api/sessions/{sessionId}` | الجلسات المرفوعة والـ JSON الأصلي بدون أي تغيير | نعم |
+| GET | `/api/sessions/{sessionId}/audio/{path}` | ملف صوت من جلستي | نعم |
+| POST | `/api/dev/simulate-collaborator-note` | **اختبار فقط** (`MINDTRACE_DEV_TOOLS=true`): زميل وهمي يضيف نوت فيصلك إشعار حقيقي | نعم |
+
+## المدخل: `POST /api/sessions`
 طريقتين:
+1. `Content-Type: application/json` والجسم هو `session.json` كامل.
+2. `multipart/form-data`: الحقل `session` = ملف `session.json`، والحقل `files` (يتكرر) = ملفات WAV، **اسم الملف هو مساره داخل المجلد**: `notes/title.wav` و`notes/note_01.wav` و`full_session.wav`. أي اسم ثاني يُرفض (422).
 
-1. **JSON فقط:** `Content-Type: application/json` والجسم هو `session.json` كامل.
-2. **JSON مع الصوت (الأساسية):** `multipart/form-data`:
-   - الحقل `session` = ملف `session.json`
-   - الحقل `files` (يتكرر) = ملفات WAV. **اسم الملف هو مساره داخل مجلد الجلسة**: `notes/title.wav` و`notes/note_01.wav` و`full_session.wav`. أي اسم غير هذي يُرفض.
+كل تسجيل = **تجربة** (experiment)، **إلا لو العنوان المنطوق يطابق عنوان تجربة عندك** (بدون اعتبار للحروف الكبيرة والترقيم والتشكيل): وقتها التسجيل **يكمل نفس التجربة** (نوتس جديدة، المدة تتجمّع، والحالة تتحدّث من `experiment_status`). ما يصير دمج بين مستخدمين. العنوان المنطوق صار عنوان التجربة، وكل نوت صار نوت `source: "recording"` فيه `asr` (الثقة وقراءة Whisper الثانية) و`speaker_check`. إعادة رفع نفس `session_id` (بعد `--retranscribe`) **تحدّث** نفس التجربة: نوتس الـ ASR تأخذ النص الجديد، ونوت عدّله شخص يدوياً **ما يتغيّر أبداً**.
 
-الرد `201`:
+الرد `201`: `{session_id, experiment_id, updated_existing, notes, audio_files, ai_status}`.
+
+شكل `session.json` (schema_version = 1): المطلوب `schema_version, session_id, status, started_at, duration_sec, note_count, notes[]`. **المنصة تحتفظ بأي حقل ما تعرفه** (برنامج اللابتوب يضيف حقول بس). التفاصيل في `MindTrace/MindTrace2/README.md`.
+
+## شكل التجربة (ما تعرضه الواجهة)
 ```json
-{"session_id": "2026-10-01_16-09-29", "updated_existing": false, "notes": 40,
- "audio_files": ["full_session.wav", "notes/note_01.wav"], "ai_status": "queued"}
+{"id":"12","code":"EXP-204","title":"...","summary":"...","status":"Active|Paused|Completed",
+ "duration":"01:42:18","originality":82,"tags":["Catalysis"],"color":"mint",
+ "created_at":"...","updated_at":"...","role":"owner|editor","owner":{"id":"MT-...","name":"...","lab":"...","initials":"NR"},
+ "collaborators":[{"id":"MT-...","name":"...","initials":"LH"}],"note_count":2,"session_id":null,"ai_status":"none",
+ "notes":[{"id":5,"text":"...","kind":"observation|hypothesis|decision","source":"manual|recording","text_source":"human|asr",
+           "time_label":"01:12","created_at":"...","author":{},"has_audio":true,"can_edit":true,
+           "asr":{"language":"Arabic","confidence":0.63,"needs_review":true,"alternative":{"engine":"faster-whisper","model":"turbo","text":"..."}}}]}
 ```
-- إرسال نفس `session_id` مرة ثانية **يحدّث** الجلسة (مثلاً بعد `--retranscribe`)، ويعيد حساب مراجعة الـ AI. الصوت القديم يبقى لو ما أُرسل جديد.
-- الأخطاء: `401` مفتاح غلط، `413` أكبر من الحد (`MINDTRACE_MAX_UPLOAD_MB`)، `422` مدخل غلط (يذكر اسم الحقل).
+(`notes` تظهر في `GET /experiments/{id}` فقط.) **`needs_review` تلميح مو دليل**: نص غلط ممكن يطلع بثقة عالية، والصوت هو المرجع.
 
-### شكل `session.json` (schema_version = 1)
-**المنصة لا تحذف أي حقل ما تعرفه**: برنامج اللابتوب يضيف حقول بس، ما يغيّر القديم. الحقول المطلوبة: `schema_version` و`session_id` و`status` و`started_at` و`duration_sec` و`note_count` و`notes`.
+## الإشعارات
+`kind`: `note_added` · `note_updated` · `collaborator_added` · `status_changed`. تُنشأ لكل أعضاء التجربة **ما عدا من قام بالفعل**. الواجهة تستعلم كل 4 ثواني.
 
-```jsonc
-{
-  "schema_version": 1,
-  "session_id": "2026-10-01_16-09-29",        // حروف وأرقام و _ - . فقط
-  "status": "complete",                       // recording | processing | complete
-  "stop_reason": "button",
-  "title": "اسم التجربة (أول كلام قاله الباحث)",
-  "started_at": "2026-10-01T16:09:29+03:00", "ended_at": "...", "duration_sec": 425.54, "note_count": 39,
-  "notes": [{
-    "id": 0, "kind": "title",                 // أول نوت = title، والباقي note مرقّمة 1..N
-    "start_sec": 4.12, "end_sec": 6.94, "duration_sec": 2.82, "time_label": "00:04",
-    "audio_file": "notes/title.wav",          // أو notes/note_01.wav
-    "text": "...", "word_count": 6,
-    "transcript_status": "done",              // done | empty | failed | skipped | unavailable | disabled
-    "speaker_check": {                        // فحص "قد لا يكون صوت الباحث" (تلميح، مو دليل)
-      "status": "reference|match|uncertain|mismatch|unavailable", "similarity": 0.72,
-      "possible_other_voice": false, "quality_warning": false, "mic_level": 0.04
-    },
-    "asr": {                                  // ثقة التحويل لنص (null لو المحرك ما يوفرها)
-      "language": "Arabic|English", "confidence": 0.63,   // 0..1
-      "needs_review": true,                   // الثقة منخفضة: راجع النوت بالصوت
-      "language_rechecked": false,
-      "alternative": {"engine": "faster-whisper", "model": "turbo", "text": "قراءة ثانية للنوت المشكوك فيه"}   // أو null
-    }
-  }],
-  "audio": {"sample_rate": 16000, "full_recording": "full_session.wav", "dropped_frames": 0},
-  "transcription": {"engine": "audar-asr", "model": "audarai/Audar-ASR-V1-Flash", "language": "ar"},
-  "device": {"firmware": "2.0.0", "session_tag": "fd35"},
-  "speaker_verification": {"enabled": true, "possible_other_voice_notes": []},
-  "experiment_status": {"state": "completed|ongoing|paused_will_resume|unknown", "source": "user|skipped|timeout|not_asked", "answered_at": null}
-}
-```
-**مهم للواجهة:** `needs_review` و`speaker_check.possible_other_voice` **تلميحات**. نص غلط ممكن يطلع بثقة عالية. الصوت الأصلي هو المرجع، فوفّر مشغّل صوت بجنب كل نوت.
-
-## القراءة (للواجهة)
-
-| الطلب | الرد |
-|---|---|
-| `GET /api/health` | `{ok, version, schema_version, ai_configured, auth_required}` |
-| `GET /api/sessions?limit=50&offset=0` | `{total, limit, offset, items:[ملخص]}` الأحدث أولاً |
-| `GET /api/sessions/{id}` | التفاصيل (تحت) |
-| `GET /api/sessions/{id}/audio/{path}` | ملف WAV. مثال: `/api/sessions/ID/audio/notes/note_03.wav` |
-| `POST /api/sessions/{id}/analyze` | يعيد تشغيل مراجعة الـ AI. `202`. و`503` لو ما في مفتاح DeepSeek |
-
-**الملخص (عنصر القائمة):**
+## مراجعة DeepSeek
+`ai.status`: `none` · `disabled` (ما في مفتاح) · `queued` · `running` · `done` · `failed` (مع `error`). النتيجة:
 ```json
-{"session_id": "...", "title": "...", "started_at": "...", "duration_sec": 425.5, "note_count": 39, "status": "complete",
- "experiment_state": "completed", "needs_review_notes": 5, "possible_other_voice_notes": 0,
- "received_at": "2026-10-01T13:17:02+00:00", "ai_status": "done"}
+{"summary":"ملخص كامل للتجربة (6-10 جمل من الوصف والنوتس)","key_points":["..."],"next_steps":["..."],"documentation_quality":{"score":45,"strengths":["..."],"gaps":["..."]},
+ "novelty":{"score":30,"rationale":"...","caveat":"تقدير من النموذج بدون بحث في الأدبيات"},
+ "note_suggestions":[{"note_id":3,"suggested_text":"...","reason":"...","confidence":"medium"}],
+ "notes_to_review":[3],"note_kinds":[{"note_id":3,"kind":"hypothesis"}],"meta":{"model":"deepseek-chat","attempts":1}}
 ```
-
-**التفاصيل:** الملخص + 
-```json
-{"updated_at": "...", "session": { /* session.json كما وصل، بدون أي تغيير */ },
- "audio_files": ["full_session.wav", "notes/note_01.wav"],
- "ai": {"status": "done", "result": { /* تحت */ }, "error": null, "updated_at": "..."}}
-```
-
-## مراجعة الـ AI (DeepSeek)
-`ai.status`: `disabled` (ما في مفتاح) · `pending` · `queued` · `running` · `done` · `failed` (مع `ai.error`).
-
-`ai.result` لما `done`:
-```json
-{"summary": "ملخص 3-6 جمل",
- "documentation_quality": {"score": 0, "strengths": ["..."], "gaps": ["شي ناقص محدد"]},
- "novelty": {"score": 0, "rationale": "...", "caveat": "تقدير من النموذج بدون بحث في الأدبيات"},
- "note_suggestions": [{"note_id": 3, "suggested_text": "قسنا الـ temperature بعد الظهر", "reason": "...", "confidence": "low|medium|high"}],
- "notes_to_review": [4, 9],
- "meta": {"model": "deepseek-chat", "provider": "deepseek", "generated_at": "..."}}
-```
-- `note_suggestions` **اقتراحات فقط**: النص الأصلي ما يتغيّر أبداً. الواجهة تعرض الاقتراح والباحث يقبله أو يرفضه.
-- `novelty.score` تقدير النموذج من معرفته، **مو فحص أدبيات**، فاعرضه بحذر.
-- النموذج يستلم **نص النوتس فقط** (بدون صوت وبدون مسارات ملفات). النص يُعامل كبيانات، مو تعليمات.
-
-## تجربة الواجهة بدون الخادم الحقيقي
-`python backend/mock_backend.py` يشغّل خادم وهمي على `localhost:8000` بنفس المسارات والأشكال، ببيانات من `bridge/samples/`.
+- **اقتراحات فقط**: نص أي نوت ما يتغيّر إلا لو قبل الباحث (زر "Use this text"). المتغيّر تلقائياً شيئين: تصنيف النوت المسجّل (`kind`) والرقم `originality` من تقدير النموذج.
+- النموذج أحياناً يرجع JSON ناقص (شفناه فعلاً مع DeepSeek): الخادم يعيد الطلب حتى 3 مرات قبل ما يعلن الفشل.
+- `novelty` تقدير من معرفة النموذج، **مو فحص أدبيات**.
+- DeepSeek يستلم **نص النوتس فقط** (بدون صوت ولا مسارات). النص يُعامل كبيانات مو تعليمات. المفتاح يبقى في الخادم، ما يوصل المتصفح أبداً.
