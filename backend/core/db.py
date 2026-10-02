@@ -1,7 +1,8 @@
 """SQLite storage (one file, WAL, foreign keys on).
 
 Tables: users, auth_sessions (login cookies), api_tokens (the laptop bridge), password_resets, experiments, notes, collaborators,
-notifications, and sessions (the recorder's session.json kept verbatim, linked to an experiment).
+notifications, sessions (the recorder's session.json kept verbatim, linked to an experiment), and teams / team_members (a lab:
+everyone in the team sees the experiments shared with it).
 """
 from __future__ import annotations
 
@@ -114,7 +115,27 @@ CREATE TABLE IF NOT EXISTS sessions (
     audio_files      TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (owner_id, session_id)
 );
+CREATE TABLE IF NOT EXISTS teams (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    invite_token TEXT UNIQUE,                            -- the join link's secret; owners/supervisors can copy or reset it
+    created_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS team_members (
+    team_id   INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role      TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner','supervisor','member')),
+    joined_at TEXT NOT NULL,
+    PRIMARY KEY (team_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 """
+
+# columns added after the first release: (table, column, definition). Applied once to older database files.
+MIGRATIONS = [
+    ("experiments", "team_id", "INTEGER REFERENCES teams(id) ON DELETE SET NULL"),
+]
 
 
 class Database:
@@ -128,6 +149,10 @@ class Database:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
             self._conn.executescript(SCHEMA)
+            for table, column, definition in MIGRATIONS:
+                cols = {r["name"] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+                if column not in cols:
+                    self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     @contextmanager
     def tx(self):
