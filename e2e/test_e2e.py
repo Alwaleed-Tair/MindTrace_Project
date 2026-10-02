@@ -349,11 +349,11 @@ def test_edit_and_delete_a_note(make_page, server):
     expect(p.pg.locator("text=second version")).to_be_visible()
     p.pg.reload()
     expect(p.pg.locator("text=second version")).to_be_visible()        # saved in the database
-    p.tid("note-delete-" + nid).click()
+    p.tid("button-delete-note-" + nid).click()
     p.tid("note-delete-cancel-" + nid).click()
     expect(p.pg.locator("text=second version")).to_be_visible()        # cancel keeps it
-    p.tid("note-delete-" + nid).click()
-    p.tid("note-delete-confirm-" + nid).click()
+    p.tid("button-delete-note-" + nid).click()
+    p.tid("button-confirm-delete-note-" + nid).click()
     expect(p.tid("notes-empty")).to_be_visible()
     p.pg.reload()
     expect(p.tid("notes-empty")).to_be_visible()

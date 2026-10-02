@@ -620,11 +620,11 @@ describe('edit and delete a note', () => {
     A.getExperiment.mockResolvedValue(exp({ notes: [mine(5, 'remove me'), mine(6, 'stay')] }));
     A.deleteNote.mockResolvedValue(undefined);
     renderApp('/experiments/1');
-    await userEvent.click(await screen.findByTestId('note-delete-5'));
+    await userEvent.click(await screen.findByTestId('button-delete-note-5'));
     expect(A.deleteNote).not.toHaveBeenCalled();
     await userEvent.click(screen.getByTestId('note-delete-cancel-5'));
-    await userEvent.click(screen.getByTestId('note-delete-5'));
-    await userEvent.click(screen.getByTestId('note-delete-confirm-5'));
+    await userEvent.click(screen.getByTestId('button-delete-note-5'));
+    await userEvent.click(screen.getByTestId('button-confirm-delete-note-5'));
     await waitFor(() => expect(A.deleteNote).toHaveBeenCalledWith(5));
   });
 
@@ -634,7 +634,7 @@ describe('edit and delete a note', () => {
     renderApp('/experiments/1');
     await screen.findByTestId('note-5');
     expect(screen.queryByTestId('note-edit-5')).toBeNull();
-    expect(screen.queryByTestId('note-delete-5')).toBeNull();
+    expect(screen.queryByTestId('button-delete-note-5')).toBeNull();
   });
 
   it('notes the AI left out as unrelated are marked', async () => {

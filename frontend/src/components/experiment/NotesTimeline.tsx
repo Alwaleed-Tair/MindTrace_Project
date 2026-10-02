@@ -46,14 +46,14 @@ function NoteBody({ experimentId, note }: { experimentId: string; note: Note }) 
           {asking ? (
             <span className="inline-flex items-center gap-2" role="alertdialog" data-testid={`note-delete-ask-${note.id}`}>
               <span className="text-muted-foreground">{t.deleteNoteAsk}</span>
-              <button type="button" onClick={() => remove.mutate(note.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-2 py-1 font-semibold text-destructive-foreground disabled:opacity-50" data-testid={`note-delete-confirm-${note.id}`}>{t.yes}</button>
+              <button type="button" onClick={() => remove.mutate(note.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-2 py-1 font-semibold text-destructive-foreground disabled:opacity-50" data-testid={`button-confirm-delete-note-${note.id}`}>{t.yes}</button>
               <button type="button" onClick={() => setAsking(false)} className="rounded-md px-2 py-1 font-semibold text-muted-foreground hover:bg-muted" data-testid={`note-delete-cancel-${note.id}`}>{t.cancel}</button>
               {remove.isError && <span className="font-semibold text-destructive" role="alert">{t.noteDeleteFailed}</span>}
             </span>
           ) : (
             <>
               <button type="button" onClick={() => { setText(note.text); setEditing(true); }} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" data-testid={`note-edit-${note.id}`}><Pencil size={11} />{t.editNote}</button>
-              <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive" data-testid={`note-delete-${note.id}`}><Trash2 size={11} />{t.deleteNote}</button>
+              <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive" data-testid={`button-delete-note-${note.id}`}><Trash2 size={11} />{t.deleteNote}</button>
             </>
           )}
         </div>
