@@ -55,6 +55,15 @@ export interface Experiment {
   session_id: string | null;
   ai_status: string;
   notes?: Note[];
+  /** When each note happened and its kind (the last 40), for the trace drawn on cards. */
+  trace?: TraceMark[];
+  kind_counts?: Record<NoteKind, number>;
+}
+
+export interface TraceMark {
+  at: string;
+  kind: NoteKind;
+  time_label: string | null;
 }
 
 export interface Stats {
