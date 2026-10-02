@@ -40,7 +40,17 @@ def role_of(db: Database, exp_id: int, user_id: int) -> str | None:
         return None
     if row["owner_id"] == user_id:
         return "owner"
-    return "editor" if db.one("SELECT 1 FROM collaborators WHERE experiment_id=? AND user_id=?", (exp_id, user_id)) else None
+    if db.one("SELECT 1 FROM collaborators WHERE experiment_id=? AND user_id=?", (exp_id, user_id)):
+        return "editor"
+    # shared with a team the user is in
+    if db.one("""SELECT 1 FROM experiments e JOIN team_members m ON m.team_id=e.team_id WHERE e.id=? AND m.user_id=?""", (exp_id, user_id)):
+        return "editor"
+    return None
+
+
+# an experiment the user can see: owns it, was added to it, or it is shared with one of the user's teams (3 user-id args)
+VISIBLE = """(e.owner_id=? OR EXISTS (SELECT 1 FROM collaborators c WHERE c.experiment_id=e.id AND c.user_id=?)
+             OR EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id=e.team_id AND tm.user_id=?))"""
 
 
 def require(db: Database, exp_id: int, user_id: int, owner_only: bool = False) -> str:
@@ -110,6 +120,13 @@ def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: se
             "can_edit": n["author_id"] == user_id or owner_id == user_id}
 
 
+def _team_of(db: Database, e) -> dict | None:
+    if not e["team_id"]:
+        return None
+    t = db.one("SELECT id, name FROM teams WHERE id=?", (e["team_id"],))
+    return {"id": str(t["id"]), "name": t["name"]} if t else None
+
+
 def serialize(db: Database, e, user_id: int, with_notes: bool = False) -> dict:
     owner = db.one("SELECT * FROM users WHERE id=?", (e["owner_id"],))
     note_count = db.one("SELECT COUNT(*) AS n FROM notes WHERE experiment_id=?", (e["id"],))["n"]
@@ -118,7 +135,7 @@ def serialize(db: Database, e, user_id: int, with_notes: bool = False) -> dict:
          "tags": json.loads(e["tags"]), "color": e["color"], "created_at": e["created_at"], "updated_at": e["updated_at"],
          "role": "owner" if e["owner_id"] == user_id else "editor",
          "owner": public(owner, include_email=False), "collaborators": _people(db, e["id"]), "note_count": note_count,
-         "session_id": e["session_id"], "ai_status": e["ai_status"]}
+         "session_id": e["session_id"], "ai_status": e["ai_status"], "team": _team_of(db, e)}
     # the "trace" the cards draw: when each note happened and its kind (last 40), plus how many of each kind
     marks = db.all("""SELECT created_at, kind, time_label FROM notes WHERE experiment_id=? ORDER BY created_at DESC, id DESC LIMIT 40""", (e["id"],))
     d["trace"] = [{"at": m["created_at"], "kind": m["kind"], "time_label": m["time_label"]} for m in reversed(marks)]
@@ -133,9 +150,7 @@ def serialize(db: Database, e, user_id: int, with_notes: bool = False) -> dict:
 
 # ------------------------------------------------------------ experiments
 def list_experiments(db: Database, user_id: int, status: str | None = None, q: str = "", sort: str = "newest") -> list[dict]:
-    rows = db.all("""SELECT e.* FROM experiments e WHERE e.owner_id=? OR EXISTS
-                     (SELECT 1 FROM collaborators c WHERE c.experiment_id=e.id AND c.user_id=?)
-                     ORDER BY e.updated_at DESC, e.id DESC""", (user_id, user_id))
+    rows = db.all(f"""SELECT e.* FROM experiments e WHERE {VISIBLE} ORDER BY e.updated_at DESC, e.id DESC""", (user_id, user_id, user_id))
     out = []
     for e in rows:
         if status and status != "All" and e["status"] != status:
@@ -153,9 +168,8 @@ def list_notes(db: Database, user_id: int, kind: str | None = None, source: str 
                review_only: bool = False, limit: int = 300) -> list[dict]:
     """Notes across every experiment the user can see (owned or shared), newest first, each with its experiment.
     Powers the Hypotheses and Recordings pages."""
-    sql = """SELECT n.* FROM notes n JOIN experiments e ON e.id=n.experiment_id
-             WHERE (e.owner_id=? OR EXISTS (SELECT 1 FROM collaborators c WHERE c.experiment_id=e.id AND c.user_id=?))"""
-    args: list = [user_id, user_id]
+    sql = f"""SELECT n.* FROM notes n JOIN experiments e ON e.id=n.experiment_id WHERE {VISIBLE}"""
+    args: list = [user_id, user_id, user_id]
     if kind:
         sql += " AND n.kind=?"
         args.append(kind)
@@ -205,18 +219,31 @@ def _clean_tags(tags) -> list[str]:
     return [t.strip()[:30] for t in tags if t.strip()][:12]
 
 
+def _check_team(db: Database, team_id, user_id: int) -> int:
+    """Sharing with a team needs you to be in it (any role)."""
+    try:
+        tid = int(team_id)
+    except (TypeError, ValueError):
+        raise Invalid("team_id must be a team id") from None
+    if not db.one("SELECT 1 FROM team_members WHERE team_id=? AND user_id=?", (tid, user_id)):
+        raise NotFound("no such team")
+    return tid
+
+
 def create_experiment(db: Database, user_id: int, title: str, summary: str = "", tags=None, *, code: str | None = None,
                       status: str = "Active", originality: int = 50, duration_sec: float = 0, color: str | None = None,
-                      session_id: str | None = None, created_at: str | None = None) -> int:
+                      session_id: str | None = None, created_at: str | None = None, team_id: int | None = None) -> int:
     title = _clean_title(title)
+    if team_id is not None:
+        _check_team(db, team_id, user_id)
     if status not in STATUSES:
         raise Invalid(f"status must be one of {', '.join(STATUSES)}")
     ts = created_at or iso()
     with db.tx() as c:
         eid = c.execute("""INSERT INTO experiments (owner_id, code, title, summary, status, duration_sec, originality, tags, color,
-                           session_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                           session_id, created_at, updated_at, team_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (user_id, code or "EXP-?", title, (summary or "").strip()[:1000], status, duration_sec, int(originality),
-                         json.dumps(_clean_tags(tags), ensure_ascii=False), color or "mint", session_id, ts, ts)).lastrowid
+                         json.dumps(_clean_tags(tags), ensure_ascii=False), color or "mint", session_id, ts, ts, team_id)).lastrowid
         if code is None:
             c.execute("UPDATE experiments SET code=?, color=? WHERE id=?", (f"EXP-{eid}", color or COLORS[eid % len(COLORS)], eid))
     return eid
@@ -239,6 +266,10 @@ def update_experiment(db: Database, exp_id: int, user_id: int, patch: dict) -> d
                 sets.append("summary=?"); args.append(str(patch["summary"]).strip()[:1000])
             else:
                 sets.append("tags=?"); args.append(json.dumps(_clean_tags(patch["tags"]), ensure_ascii=False))
+    if "team_id" in patch:
+        if role != "owner":
+            raise Forbidden("only the owner can share the experiment with a team")
+        sets.append("team_id=?"); args.append(None if patch["team_id"] in (None, "") else _check_team(db, patch["team_id"], user_id))
     if not sets:
         raise Invalid("nothing to update")
     with db.tx() as c:
@@ -359,12 +390,19 @@ def _notify_one(db: Database, recipient_id: int, actor_id: int, exp_id: int, kin
            (recipient_id, actor_id, exp_id, note_id, kind, message, iso()))
 
 
+def notify_user(db: Database, recipient_id: int, actor_id: int, kind: str, message: str) -> None:
+    """A notification that is not about one experiment (e.g. being added to a team)."""
+    db.run("""INSERT INTO notifications (user_id, actor_id, experiment_id, note_id, kind, message, created_at) VALUES (?,?,NULL,NULL,?,?,?)""",
+           (recipient_id, actor_id, kind, message, iso()))
+
+
 def notify_members(db: Database, exp_id: int, actor_id: int, kind: str, message: str, note_id: int | None = None) -> int:
     """Everyone in the experiment except the person who did it."""
     exp = db.one("SELECT owner_id FROM experiments WHERE id=?", (exp_id,))
     if exp is None:
         return 0
     ids = {exp["owner_id"]} | {r["user_id"] for r in db.all("SELECT user_id FROM collaborators WHERE experiment_id=?", (exp_id,))}
+    ids |= {r["user_id"] for r in db.all("""SELECT m.user_id FROM team_members m JOIN experiments e ON e.team_id=m.team_id WHERE e.id=?""", (exp_id,))}
     ids.discard(actor_id)
     for rid in ids:
         _notify_one(db, rid, actor_id, exp_id, kind, message, note_id)
