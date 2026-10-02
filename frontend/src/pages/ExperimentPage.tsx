@@ -1,4 +1,4 @@
-import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clock3, FileText, Lightbulb, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { StatusPill } from '@/components/common/StatusPill';
@@ -12,12 +12,14 @@ import { ExportMenu } from '@/components/experiment/ExportMenu';
 import { InsightsTab, OriginalityCard, useAutoTranslate } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
+import { SessionTrace, kindColor, tracePositions, usesRecordingClock } from '@/components/common/Trace';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useAddNote, useExperiment, useInsights, useSetStatus } from '@/hooks/queries';
 import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
-import { relativeTime } from '@/lib/format';
-import type { Experiment } from '@/lib/types';
+import { clockTime, fill, relativeTime } from '@/lib/format';
+import { kindLabel } from '@/lib/report';
+import type { Experiment, Note } from '@/lib/types';
 
 type Tab = 'overview' | 'insights';
 
@@ -68,6 +70,22 @@ function Detail({ experiment }: { experiment: Experiment }) {
   const thisWeek = notes.filter((n) => new Date(n.created_at).getTime() >= weekAgo).length;
   const shared = experiment.collaborators.length > 0 || experiment.role === 'editor';
   const people = [experiment.owner, ...experiment.collaborators];
+  const pos = tracePositions(notes.map((n) => ({ at: n.created_at, time_label: n.time_label })), experiment.duration_sec);
+  const when = (n: Note) => n.time_label ?? clockTime(n.created_at, language);
+  const points = notes.map((n, i) => ({ id: n.id, pos: pos[i], kind: n.kind, label: `${kindLabel(n.kind, t)} · ${when(n)} · ${n.text.slice(0, 80)}` }));
+  const count = (k: Note['kind']) => notes.filter((n) => n.kind === k).length;
+  const hypotheses = notes.filter((n) => n.kind === 'hypothesis');
+  // jump to a note from the trace or the hypotheses list, and flash it so the eye finds it
+  const jumpTo = (id: number) => {
+    setTab('overview');
+    setTimeout(() => {
+      const el = document.getElementById(`note-${id}`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('bg-accent/60');
+      setTimeout(() => el.classList.remove('bg-accent/60'), 1400);
+    }, 50);
+  };
 
   const tabs: [Tab, string, typeof LayoutDashboard][] = [
     ['overview', t.overview, LayoutDashboard],
@@ -76,15 +94,17 @@ function Detail({ experiment }: { experiment: Experiment }) {
 
   return (
     <div className="animate-in" data-testid="experiment-page" data-status={experiment.status}>
-      <button type="button" onClick={() => navigate('/dashboard')} className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground transition hover:text-primary" data-testid="button-back-dashboard">
+      <header className="ink-band -mx-1 rounded-3xl border border-sidebar-border p-5 sm:mx-0 sm:p-8" data-testid="experiment-header">
+      <button type="button" onClick={() => navigate('/dashboard')} className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground transition hover:text-primary" data-testid="button-back-dashboard">
         <ArrowLeft size={15} className="rtl:rotate-180" />
         {t.back}
       </button>
-      <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-        <div>
+      <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <StatusPill status={experiment.status} />
-            <span className="font-mono text-[10px] text-muted-foreground">{experiment.code}</span>
+            <span className="font-mono text-[11px] text-muted-foreground">{experiment.code}</span>
+            <span className="text-[11px] text-muted-foreground">{fill(t.startedOn, { date: relativeTime(experiment.created_at, language) })}</span>
             <div className="flex -space-x-2 rtl:space-x-reverse">{people.slice(0, 5).map((p) => <Avatar key={p.id} person={p} size={24} ring />)}</div>
           </div>
           {editing ? (
@@ -132,14 +152,35 @@ function Detail({ experiment }: { experiment: Experiment }) {
         </button>
       </div>
       {recording && (
-        <div className="animate-in mt-5 flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-xs text-destructive" data-testid="status-recording">
+        <div className="animate-in mt-5 flex items-center gap-3 rounded-xl border border-destructive/40 bg-destructive/15 px-4 py-3 text-xs text-white" data-testid="status-recording">
           <span className="recording-pulse h-2 w-2 rounded-full bg-destructive" />
           <span className="font-semibold">{t.recordingOn}</span>
-          <span className="text-destructive/70">{t.recordingNote}</span>
+          <span className="text-white/70">{t.recordingNote}</span>
         </div>
       )}
 
-      <div className="mt-10 flex gap-5 overflow-x-auto border-b border-border" role="tablist">
+      <section className="mt-8 border-t border-border pt-6" aria-labelledby="trace-h" data-testid="trace-section">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 id="trace-h" className="text-sm font-semibold">{t.sessionTrace}</h2>
+            <span className="text-xs text-muted-foreground" data-testid="trace-kinds">{fill(t.kindsCount, { o: count('observation'), h: count('hypothesis'), d: count('decision') })}</span>
+          </div>
+          {notes.length > 0 && <span className="text-[11px] text-muted-foreground">{t.traceHint}</span>}
+        </div>
+        {notes.length ? (
+          <SessionTrace
+            points={points}
+            start={usesRecordingClock(notes) ? '00:00' : clockTime(notes[0].created_at, language)}
+            end={usesRecordingClock(notes) ? (experiment.duration_sec ? experiment.duration : (notes[notes.length - 1].time_label ?? '')) : clockTime(notes[notes.length - 1].created_at, language)}
+            onPick={jumpTo}
+          />
+        ) : (
+          <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground" data-testid="trace-empty">{t.firstObservation}</p>
+        )}
+      </section>
+      </header>
+
+      <div className="mt-8 flex gap-5 overflow-x-auto border-b border-border" role="tablist">
         {tabs.map(([value, label, Icon]) => (
           <button type="button" key={value} onClick={() => setTab(value)} className={`flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 text-xs font-semibold transition ${tab === value ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`} role="tab" aria-selected={tab === value} data-testid={`tab-${value}`}>
             <Icon size={14} />
@@ -150,7 +191,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
 
       {tab === 'overview' && (
         <>
-          <div className="mt-7 grid gap-4 sm:grid-cols-2 " data-testid="experiment-metrics">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2" data-testid="experiment-metrics">
             <MetricCard testId="metric-notes-count" icon={FileText} label={t.notesMetric} value={String(notes.length)} note={`${thisWeek} ${t.newThisWeek}`} />
             <MetricCard testId="metric-duration" icon={Clock3} label={t.duration} value={experiment.duration} note={`${t.lastUpdate} ${relativeTime(experiment.updated_at, language)}`} />
           </div>
@@ -159,6 +200,26 @@ function Detail({ experiment }: { experiment: Experiment }) {
             <NotesTimeline experimentId={experiment.id} notes={notes} showAuthors={shared} ignoredIds={ignoredIds} />
             <aside className="space-y-5">
               <AddNoteCard experimentId={experiment.id} text={draft} onText={setDraft} dictation={dictation} />
+              <section className="surface p-5" data-testid="card-hypotheses">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{t.hypothesesTitle}</h3>
+                  <Lightbulb size={15} style={{ color: kindColor('hypothesis') }} />
+                </div>
+                {hypotheses.length ? (
+                  <ul className="mt-3 space-y-2">
+                    {hypotheses.map((h) => (
+                      <li key={h.id}>
+                        <button type="button" onClick={() => jumpTo(h.id)} className="w-full rounded-xl border-s-[3px] bg-kind-hyp-soft/70 px-3 py-2.5 text-start text-xs leading-5 transition hover:bg-kind-hyp-soft" style={{ borderColor: kindColor('hypothesis') }} data-testid={`hypothesis-${h.id}`}>
+                          <span className="line-clamp-3" dir="auto">{h.text}</span>
+                          <span className="mt-1 block font-mono text-[10px] text-muted-foreground">{when(h)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground" data-testid="hypotheses-empty">{t.noHypotheses}</p>
+                )}
+              </section>
               <OriginalityCard experiment={experiment} />
             </aside>
           </div>

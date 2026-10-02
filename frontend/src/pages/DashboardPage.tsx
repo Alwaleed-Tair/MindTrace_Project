@@ -1,4 +1,4 @@
-import { ArrowDownAZ, ChevronDown, FlaskConical, Lightbulb, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownAZ, ChevronDown, FileCheck2, FlaskConical, NotebookPen, Plus, Search, SlidersHorizontal, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { CreateExperimentDialog } from '@/components/dashboard/CreateExperimentDialog';
@@ -27,6 +27,9 @@ export default function DashboardPage() {
   const create = useCreateExperiment();
 
   const items = experiments.data ?? [];
+  const sd = stats.data;
+  const quality = sd?.insights.avg_documentation_quality;
+  const review = sd?.insights.notes_to_review ?? 0;
   const greetName = greetingName(user?.name ?? '');
 
   return (
@@ -43,10 +46,11 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div className="mt-9 grid gap-4 sm:grid-cols-2" data-testid="metrics">
-        <MetricCard testId="metric-active" icon={FlaskConical} label={t.activeThreads} value={String(stats.data?.active_threads ?? 0).padStart(2, '0')} note={t.inMotion} delay={1} />
-        {/* no subtext under this one, on purpose */}
-        <MetricCard testId="metric-originality" icon={Lightbulb} label={t.avgOriginality} value={`${stats.data?.avg_originality ?? 0}%`} delay={3} />
+      <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="metrics">
+        <MetricCard testId="metric-active" icon={FlaskConical} label={t.activeThreads} value={String(sd?.active_threads ?? 0)} note={fill(t.ofTotal, { n: sd?.total_threads ?? 0 })} delay={1} />
+        <MetricCard testId="metric-notes" icon={NotebookPen} label={t.notesThisWeek} value={String(sd?.notes_this_week ?? 0)} note={fill(t.vsLastWeek, { n: sd?.notes_last_week ?? 0 })} delay={2} />
+        <MetricCard testId="metric-quality" icon={FileCheck2} label={t.docQualityAvg} value={quality === null || quality === undefined ? '—' : `${quality}%`} note={fill(t.analyzedOf, { n: sd?.insights.experiments_analyzed ?? 0 })} delay={3} />
+        <MetricCard testId="metric-review" icon={TriangleAlert} tone={review ? 'warn' : 'default'} label={t.toReview} value={String(review)} note={t.toReviewSub} delay={4} />
       </div>
 
       <section className="mt-10 animate-in delay-3">
