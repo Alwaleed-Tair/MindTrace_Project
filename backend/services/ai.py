@@ -167,7 +167,11 @@ def _loads(content: str) -> dict:
     return data
 
 
-def parse_result(content: str, valid_note_ids: set[int]) -> dict:
+def _norm(t: str) -> str:
+    return re.sub(r"[\W_]+", " ", t or "").strip().casefold()
+
+
+def parse_result(content: str, valid_note_ids: set[int], note_texts: dict[int, str] | None = None) -> dict:
     data = _loads(content)
     if "documentation_quality" not in data and "documentation_score" in data:    # flat keys: far fewer malformed closers than nesting
         data["documentation_quality"] = {"score": data.pop("documentation_score"), "strengths": data.pop("strengths", []), "gaps": data.pop("gaps", [])}
@@ -179,6 +183,8 @@ def parse_result(content: str, valid_note_ids: set[int]) -> dict:
             f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()[:4])) from exc
     # suggestions only for notes that exist; ids that do not exist are dropped
     res.note_suggestions = [s for s in res.note_suggestions if s.note_id in valid_note_ids and s.suggested_text.strip()]
+    if note_texts:                                                  # a "fix" that is the same text as the note is not a fix
+        res.note_suggestions = [s for s in res.note_suggestions if _norm(s.suggested_text) != _norm(note_texts.get(s.note_id, ""))]
     res.ignored_note_ids = sorted({i for i in res.ignored_note_ids if i in valid_note_ids})
     res.notes_to_review = sorted({i for i in res.notes_to_review if i in valid_note_ids})
     res.note_kinds = [k for k in res.note_kinds if k.note_id in valid_note_ids and k.kind in ("observation", "hypothesis", "decision")]
@@ -235,7 +241,8 @@ def _chat_json(settings: Settings, messages: list[dict], parse, client: httpx.Cl
 
 def analyze(settings: Settings, session: dict, client: httpx.Client | None = None) -> dict:
     ids = {n["id"] for n in session.get("notes", []) if isinstance(n.get("id"), int)}
-    result, attempts = _chat_json(settings, build_messages(session, settings.ai_language), lambda c: parse_result(c, ids), client)
+    texts = {n["id"]: str(n.get("text", "")) for n in session.get("notes", []) if isinstance(n.get("id"), int)}
+    result, attempts = _chat_json(settings, build_messages(session, settings.ai_language), lambda c: parse_result(c, ids, texts), client)
     result["meta"] = {"model": settings.deepseek_model, "provider": "deepseek", "attempts": attempts,
                       "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     return result

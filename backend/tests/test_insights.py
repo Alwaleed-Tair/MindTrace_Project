@@ -1,6 +1,7 @@
 import json
 
 import httpx
+from services import ai
 import pytest
 from fastapi.testclient import TestClient
 
@@ -271,3 +272,11 @@ def test_a_corrected_recorded_note_stops_asking_for_review(tmp_path):
     u.patch(f"/api/notes/{flagged['id']}", json={"text": "corrected by me"})
     after = next(n for n in u.get(f"/api/experiments/{eid}").json()["notes"] if n["id"] == flagged["id"])
     assert after["text"] == "corrected by me" and after["asr"]["needs_review"] is False
+
+
+def test_an_ai_fix_identical_to_the_note_is_dropped():
+    same = {"note_id": 1, "suggested_text": "أتوقع أن الإضاءة الزرقاء أسرع.", "reason": "same", "confidence": "low"}
+    diff = {"note_id": 2, "suggested_text": "قصنا طول النبتة", "reason": "fix", "confidence": "high"}
+    out = ai.parse_result(json.dumps(good(note_suggestions=[same, diff]), ensure_ascii=False), {1, 2},
+                          {1: "أتوقع أن الإضاءة الزرقاء أسرع", 2: "قسم طول النبتة"})
+    assert [s["note_id"] for s in out["note_suggestions"]] == [2]

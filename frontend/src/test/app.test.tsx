@@ -660,3 +660,17 @@ describe('dictation errors are specific', () => {
     delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
   });
 });
+
+
+describe('the "needs review" badge is only for really uncertain notes', () => {
+  const asr = (confidence: number) => ({ language: 'Arabic', confidence, needs_review: true, language_rechecked: false, alternative: { engine: 'faster-whisper', model: 'turbo', text: 'second' } });
+  it('shows it below 0.85 confidence and hides it (and the second reading) at 0.85 or above', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ notes: [mine(1, 'low confidence', { asr: asr(0.7) }), mine(2, 'fine really', { asr: asr(0.89) })] }));
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('note-review-1')).toBeInTheDocument();
+    expect(screen.getByTestId('note-alt-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('note-review-2')).toBeNull();
+    expect(screen.queryByTestId('note-alt-2')).toBeNull();
+  });
+});

@@ -62,6 +62,11 @@ function NoteBody({ experimentId, note }: { experimentId: string; note: Note }) 
   );
 }
 
+/** The recorder flags a note as uncertain when its confidence is low OR the second reading differs. The second reading is often the worse one,
+ *  so the badge only shows when the confidence is really low. */
+export const REVIEW_BELOW = 0.85;
+const shouldReview = (n: Note) => !!n.asr?.needs_review && (n.asr.confidence ?? 0) < REVIEW_BELOW;
+
 export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignoredIds }: { experimentId: string; notes: Note[]; showAuthors: boolean; limit?: number; ignoredIds?: number[] }) {
   const { t, language } = usePreferences();
   const shown = limit ? notes.slice(-limit) : notes;
@@ -86,12 +91,12 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignored
                   <span className="font-mono text-[10px] text-muted-foreground">{note.time_label ?? clockTime(note.created_at, language)}</span>
                   <span className="text-[10px] font-semibold uppercase tracking-[.1em] text-primary" data-testid={`note-kind-${note.id}`}>{note.kind}</span>
                   {note.source === 'recording' && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><AudioLines size={10} />{t.fromRecording}</span>}
-                  {note.asr?.needs_review && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300" data-testid={`note-review-${note.id}`}><Eye size={10} />{t.needsReview}</span>}
+                  {shouldReview(note) && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300" data-testid={`note-review-${note.id}`}><Eye size={10} />{t.needsReview}</span>}
                   {ignoredIds?.includes(note.id) && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground" data-testid={`note-ignored-${note.id}`}>{t.ignoredByAi}</span>}
                   {showAuthors && note.author && <span className="ms-auto inline-flex items-center gap-1.5 text-[10px] text-muted-foreground"><Avatar person={note.author} size={18} />{note.author.name}</span>}
                 </div>
                 <NoteBody experimentId={experimentId} note={note} />
-                {note.asr?.needs_review && note.asr.alternative && (
+                {shouldReview(note) && note.asr?.alternative && (
                   <p className="mt-1.5 rounded-lg bg-muted/70 px-3 py-2 text-xs leading-5 text-muted-foreground" dir="auto" data-testid={`note-alt-${note.id}`}>
                     <span className="font-semibold">{t.secondReading}: </span>
                     {note.asr.alternative.text}

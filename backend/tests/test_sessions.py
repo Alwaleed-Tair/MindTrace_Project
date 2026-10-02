@@ -226,3 +226,25 @@ def test_a_collaborator_cannot_delete_but_the_owner_can(app):
     assert b.delete(f"/api/experiments/{eid}").status_code == 403
     assert a.delete(f"/api/experiments/{eid}").status_code == 204
     assert b.get("/api/experiments").json()["items"] == []
+
+
+def test_needs_review_is_only_shown_when_the_second_reading_really_disagrees(app):
+    """Real notes from the device: the flag fired on notes whose second reading said the same words."""
+    u = new_client(app, "rev@x.com")
+    s = sample()
+    cases = [   # (text, second reading, confidence, expected flag)
+        ("أتوقع أن الإضاءة الزرقاء تخلي عملية النمو أسرع من البيضاء.", "توقع ان الاضاءة الزرجة تخلي عملية النمو اسرع من البيض", 0.89, False),
+        ("واحد، اثنين، ثلاثة، هذا اختبار للمايك، تسمعني؟ صوت واضح؟", "واحد اثنين ثلاثة هذا اختبار لمايك تسمعني الصوت واضح", 0.81, False),
+        ("أنا فخور جدا، أمسى براودف ذاتي، قاعد يشتغل بشكل فيري نايس.", "أنا فخور جداً وأنا جميعاً من ذلك يعمل بشكل جيد", 0.5, True),
+        ("قسنا زمن التفاعل الأول، وكانت ثنتي عشرة ثاني.", "قسنا زمن التفاعل الأول وكان 12 ثانية", 0.72, True),
+        ("نص ما له قراءة ثانية", None, 0.85, True),                                  # nothing to compare with: keep the device's flag
+        ("نص ثقته منخفضة جداً", "نص ثقته منخفضة جداً", 0.6, True),                    # same words but the model was very unsure
+    ]
+    s["notes"] = [s["notes"][0]] + [{**s["notes"][1], "id": i + 1, "text": t, "audio_file": f"notes/note_{i + 1:02d}.wav",
+                                     "asr": {"language": "Arabic", "confidence": c, "needs_review": True, "language_rechecked": False,
+                                             "alternative": ({"engine": "faster-whisper", "model": "turbo", "text": alt} if alt else None)}}
+                                    for i, (t, alt, c, _) in enumerate(cases)]
+    s["note_count"] = len(s["notes"])
+    eid = post(app, token(u), s).json()["experiment_id"]
+    shown = [n["asr"]["needs_review"] for n in u.get(f"/api/experiments/{eid}").json()["notes"]]
+    assert shown == [c[3] for c in cases], shown

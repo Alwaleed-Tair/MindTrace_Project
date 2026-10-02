@@ -1,7 +1,10 @@
 """Experiments, their notes, collaborators and notifications (the domain the web UI shows)."""
 from __future__ import annotations
 
+import difflib
 import json
+import re
+import unicodedata
 from datetime import timedelta
 
 from core.db import Database
@@ -65,6 +68,28 @@ def audio_files_of(db: Database, exp_id: int) -> set[tuple[str, str]]:
     return out
 
 
+def _norm_ar(t: str) -> str:
+    t = unicodedata.normalize("NFKC", t or "").casefold()
+    t = re.sub(r"[\u064B-\u065F\u0670\u0640]", "", t)
+    t = re.sub(r"[أإآٱ]", "ا", t).replace("ة", "ه").replace("ى", "ي").replace("ؤ", "و").replace("ئ", "ي")
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]|_", " ", t)).strip()
+
+
+REVIEW_SIMILAR_ABOVE = 0.90     # the second reading says (almost) the same words: not worth a human look...
+REVIEW_ALWAYS_BELOW = 0.70      # ...unless the first reading itself was very unsure
+
+
+def _worth_reviewing(text: str, asr: dict) -> bool:
+    """The device flags every note whose confidence is a bit low. The second reading is a weaker model, so when it agrees with
+    the text (ignoring punctuation, hamza, taa marbuta, vowel marks) the flag is just noise. Only show it when the two disagree,
+    or when there is no second reading, or the confidence is very low."""
+    alt = (asr.get("alternative") or {}).get("text")
+    conf = asr.get("confidence")
+    if not alt or (isinstance(conf, (int, float)) and conf < REVIEW_ALWAYS_BELOW):
+        return True
+    return difflib.SequenceMatcher(None, _norm_ar(text), _norm_ar(alt)).ratio() < REVIEW_SIMILAR_ABOVE
+
+
 def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: set[tuple[str, str]] | None = None) -> dict:
     author = db.one("SELECT * FROM users WHERE id=?", (n["author_id"],))
     meta = json.loads(n["meta"] or "{}")
@@ -72,8 +97,11 @@ def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: se
         audio_files = audio_files_of(db, n["experiment_id"])
     first_session = (db.one("SELECT session_id FROM experiments WHERE id=?", (n["experiment_id"],)) or {"session_id": None})["session_id"]
     asr = meta.get("asr")
-    if asr and n["text_source"] == "human" and asr.get("needs_review"):          # a person already corrected it: nothing left to review
-        asr = {**asr, "needs_review": False}
+    if asr and asr.get("needs_review"):
+        if n["text_source"] == "human":                                          # a person already corrected it: nothing left to review
+            asr = {**asr, "needs_review": False}
+        elif not _worth_reviewing(n["text"], asr):
+            asr = {**asr, "needs_review": False}
     return {"id": n["id"], "text": n["text"], "kind": n["kind"], "source": n["source"], "text_source": n["text_source"],
             "time_label": n["time_label"], "created_at": n["created_at"], "updated_at": n["updated_at"],
             "author": public(author, include_email=False) if author else None,
