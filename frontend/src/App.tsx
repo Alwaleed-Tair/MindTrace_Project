@@ -8,6 +8,9 @@ import { NotificationsProvider } from '@/context/NotificationsContext';
 import { PreferencesProvider } from '@/context/PreferencesContext';
 import DashboardPage from '@/pages/DashboardPage';
 import ExperimentPage from '@/pages/ExperimentPage';
+import ExperimentsPage from '@/pages/ExperimentsPage';
+import HypothesesPage from '@/pages/HypothesesPage';
+import RecordingsPage from '@/pages/RecordingsPage';
 import NotFound from '@/pages/not-found';
 import ReportPage from '@/pages/ReportPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
@@ -38,6 +41,15 @@ function Routes() {
         <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/dashboard">
           <Private><DashboardPage /></Private>
+        </Route>
+        <Route path="/experiments">
+          <Private><ExperimentsPage /></Private>
+        </Route>
+        <Route path="/hypotheses">
+          <Private><HypothesesPage /></Private>
+        </Route>
+        <Route path="/recordings">
+          <Private><RecordingsPage /></Private>
         </Route>
         <Route path="/experiments/:id/report">
           <Private bare><ReportPage /></Private>
