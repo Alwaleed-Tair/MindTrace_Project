@@ -31,10 +31,23 @@ class Settings:
     literature_enabled: bool = field(default_factory=lambda: _flag("MINDTRACE_LITERATURE", True))   # originality: search scholarly sources
     ai_timeout_sec: float = field(default_factory=lambda: float(os.environ.get("MINDTRACE_AI_TIMEOUT_SEC", "90")))
     ai_language: str = field(default_factory=lambda: os.environ.get("MINDTRACE_AI_LANGUAGE", "Arabic"))
+    # Password reset e-mails. Without SMTP_HOST the reset link is written to the server log instead
+    # (fine on a lab machine; `python manage.py reset-link EMAIL` prints one too).
+    public_url: str = field(default_factory=lambda: os.environ.get("MINDTRACE_PUBLIC_URL", "").rstrip("/"))
+    smtp_host: str = field(default_factory=lambda: os.environ.get("MINDTRACE_SMTP_HOST", ""))
+    smtp_port: int = field(default_factory=lambda: int(os.environ.get("MINDTRACE_SMTP_PORT", "587")))
+    smtp_user: str = field(default_factory=lambda: os.environ.get("MINDTRACE_SMTP_USER", ""))
+    smtp_password: str = field(default_factory=lambda: os.environ.get("MINDTRACE_SMTP_PASSWORD", ""))
+    smtp_from: str = field(default_factory=lambda: os.environ.get("MINDTRACE_SMTP_FROM", ""))
+    reset_minutes: int = field(default_factory=lambda: int(os.environ.get("MINDTRACE_RESET_MINUTES", "60")))
 
     @property
     def ai_configured(self) -> bool:
         return bool(self.deepseek_api_key)
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.smtp_host)
 
     @property
     def db_path(self) -> Path:
