@@ -1,4 +1,4 @@
-import { Beaker, CheckCircle2, Clock3, PauseCircle, Trash2, UserPlus } from 'lucide-react';
+import { Clock3, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { Avatar } from '@/components/common/Avatar';
@@ -6,16 +6,12 @@ import { StatusPill } from '@/components/common/StatusPill';
 import { DeleteExperimentDialog } from '@/components/dashboard/DeleteExperimentDialog';
 import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
 import { StatusActions } from '@/components/dashboard/StatusActions';
+import { TraceLine, kindColor, tracePositions } from '@/components/common/Trace';
 import { usePreferences } from '@/context/PreferencesContext';
 import { fill, relativeTime } from '@/lib/format';
-import type { Experiment, Status } from '@/lib/types';
+import type { Experiment, NoteKind, Status } from '@/lib/types';
 
-const colorClass: Record<string, string> = {
-  mint: 'bg-accent/45 text-primary',
-  lilac: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
-  sand: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-  blue: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300',
-};
+const KINDS: NoteKind[] = ['observation', 'hypothesis', 'decision'];
 
 const stateClass: Record<Status, string> = {
   Active: '',
@@ -29,20 +25,17 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
   const [deleteOpen, setDeleteOpen] = useState(false);
   const e = experiment;
   const people = [e.owner, ...e.collaborators];
+  const marks = e.trace ?? [];
+  const pos = tracePositions(marks, e.duration_sec);
+  const points = marks.map((m, i) => ({ pos: pos[i], kind: m.kind }));
+  const counts = e.kind_counts;
+  const analyzed = e.ai_status === 'done';
+  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, hypothesis: t.kindHypothesis, decision: t.kindDecision };
 
   return (
     <article className={`group surface p-5 transition duration-200 hover:border-primary/40 ${stateClass[e.status]}`} data-testid={`card-experiment-${e.id}`} data-status={e.status}>
       <Link href={`/experiments/${e.id}`} className="block rounded-xl" data-testid={`link-experiment-${e.id}`}>
-        <div className="flex items-start justify-between gap-4">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colorClass[e.color] ?? colorClass.mint}`}>
-            {e.status === 'Completed' ? <CheckCircle2 size={18} /> : e.status === 'Paused' ? <PauseCircle size={18} /> : <Beaker size={18} />}
-          </div>
-          <div className="flex -space-x-2 rtl:space-x-reverse" data-testid={`people-${e.id}`}>
-            {people.slice(0, 4).map((p) => <Avatar key={p.id} person={p} size={26} ring />)}
-            {people.length > 4 && <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full bg-muted text-[10px] font-bold ring-2 ring-card">+{people.length - 4}</span>}
-          </div>
-        </div>
-        <div className="mt-5">
+        <div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={e.status} />
             <span className="font-mono text-[10px] text-muted-foreground">{e.code}</span>
@@ -51,23 +44,44 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
           <h3 className="mt-3 line-clamp-1 text-[17px] font-semibold tracking-[-.03em]">{e.title}</h3>
           <p className="mt-2 line-clamp-2 min-h-[40px] text-xs leading-5 text-muted-foreground">{e.summary}</p>
         </div>
-        <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-[10px] text-muted-foreground">
+        <div className="mt-4">
+          <TraceLine points={points} testId={`trace-${e.id}`} />
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground" data-testid={`kinds-${e.id}`}>
+            {KINDS.map((k) => (
+              <span key={k} className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: kindColor(k) }} />
+                <span className="font-mono font-semibold text-foreground">{counts?.[k] ?? 0}</span>
+                {kindName[k]}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-3 border-t border-border pt-4 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1.5"><Clock3 size={12} />{relativeTime(e.updated_at, language)}</span>
-          <span className="font-mono text-primary">{fill(t.signal, { n: e.originality })}</span>
+          <span className="ms-auto flex -space-x-2 rtl:space-x-reverse" data-testid={`people-${e.id}`}>
+            {people.slice(0, 3).map((p) => <Avatar key={p.id} person={p} size={22} ring />)}
+            {people.length > 3 && <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-muted text-[10px] font-bold ring-2 ring-card">+{people.length - 3}</span>}
+          </span>
+          {analyzed ? (
+            <span className="font-mono font-semibold text-primary" data-testid={`originality-${e.id}`}>{fill(t.originalityShort, { n: e.originality })}</span>
+          ) : (
+            <span data-testid={`originality-${e.id}`}>{t.notAnalyzed}</span>
+          )}
         </div>
       </Link>
 
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid={`actions-${e.id}`}>
         <StatusActions id={e.id} status={e.status} onSetStatus={onSetStatus} />
-        <button type="button" onClick={() => setPeopleOpen(true)} className="ms-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-foreground" data-testid={`button-add-people-${e.id}`}>
+        <span className="ms-auto flex items-center gap-2">
+        <button type="button" onClick={() => setPeopleOpen(true)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition hover:border-primary/50 hover:text-foreground" aria-label={t.addPeople} title={t.addPeople} data-testid={`button-add-people-${e.id}`}>
           <UserPlus size={13} />
-          {t.addPeople}
         </button>
         {e.role === 'owner' && (
           <button type="button" onClick={() => setDeleteOpen(true)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition hover:border-destructive/50 hover:text-destructive" aria-label={t.deleteExperiment} title={t.deleteExperiment} data-testid={`button-delete-${e.id}`}>
             <Trash2 size={13} />
           </button>
         )}
+        </span>
       </div>
       {peopleOpen && <AddPeopleDialog experiment={e} open={peopleOpen} onOpenChange={setPeopleOpen} />}
       {deleteOpen && <DeleteExperimentDialog experiment={e} open={deleteOpen} onOpenChange={setDeleteOpen} />}

@@ -1,15 +1,16 @@
 import type { LucideIcon } from 'lucide-react';
 
-export function MetricCard({ icon: Icon, label, value, note, delay = 1, testId }: { icon: LucideIcon; label: string; value: string; note?: string; delay?: number; testId: string }) {
+/** One figure in the stats strip at the top of the dashboard. */
+export function MetricCard({ icon: Icon, label, value, note, delay = 1, testId, tone = 'default' }: { icon: LucideIcon; label: string; value: string; note?: string; delay?: number; testId: string; tone?: 'default' | 'warn' }) {
   return (
-    <div className={`animate-in delay-${delay} surface p-5`} data-testid={testId}>
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon size={17} /></span>
-        <span className="text-sm text-muted-foreground">{label}</span>
+    <div className={`animate-in delay-${delay} surface flex flex-col gap-3 p-4`} data-testid={testId}>
+      <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        <Icon size={15} className={tone === 'warn' ? 'text-kind-dec' : 'text-primary'} />
+        <span>{label}</span>
       </div>
-      <div className="mt-4 flex items-end gap-2">
-        <strong className="font-mono text-4xl font-semibold tracking-[-.04em]">{value}</strong>
-        {note && <span className="mb-1.5 text-xs text-muted-foreground">{note}</span>}
+      <div className="flex items-baseline gap-2">
+        <strong className="font-mono text-[28px] font-semibold leading-none tracking-[-.03em]">{value}</strong>
+        {note && <span className="text-xs text-muted-foreground">{note}</span>}
       </div>
     </div>
   );
