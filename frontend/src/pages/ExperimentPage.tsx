@@ -1,4 +1,4 @@
-import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Sparkles, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { StatusPill } from '@/components/common/StatusPill';
@@ -7,6 +7,7 @@ import { AddPeopleDialog } from '@/components/dashboard/AddPeopleDialog';
 import { MetricCard } from '@/components/dashboard/MetricCards';
 import { StatusActions } from '@/components/dashboard/StatusActions';
 import { AddNoteCard, NOTE_TEXTAREA_ID } from '@/components/experiment/AddNoteCard';
+import { EditDetails } from '@/components/experiment/EditDetails';
 import { ExportMenu } from '@/components/experiment/ExportMenu';
 import { InsightsTab, OriginalityCard } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
@@ -58,6 +59,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
   };
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const setStatus = useSetStatus();
   const notes = experiment.notes ?? [];
   const weekAgo = Date.now() - 7 * 86400_000;
@@ -83,8 +85,21 @@ function Detail({ experiment }: { experiment: Experiment }) {
             <span className="font-mono text-[10px] text-muted-foreground">{experiment.code}</span>
             <div className="flex -space-x-2 rtl:space-x-reverse">{people.slice(0, 5).map((p) => <Avatar key={p.id} person={p} size={24} ring />)}</div>
           </div>
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-.04em] sm:text-4xl" data-testid="experiment-title">{experiment.title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{experiment.summary}</p>
+          {editing ? (
+            <EditDetails experiment={experiment} onDone={() => setEditing(false)} />
+          ) : (
+            <>
+              <div className="mt-4 flex max-w-3xl items-start gap-2">
+                <h1 className="text-3xl font-semibold tracking-[-.04em] sm:text-4xl" dir="auto" data-testid="experiment-title">{experiment.title}</h1>
+                {experiment.role === 'owner' && (
+                  <button type="button" onClick={() => setEditing(true)} aria-label={t.editDetails} title={t.editDetails} className="mt-1.5 shrink-0 rounded-lg border border-border p-2 text-muted-foreground transition hover:border-primary/50 hover:text-foreground" data-testid="button-edit-details">
+                    <Pencil size={14} />
+                  </button>
+                )}
+              </div>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground" dir="auto">{experiment.summary}</p>
+            </>
+          )}
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <StatusActions id={experiment.id} status={experiment.status} onSetStatus={(id, status) => setStatus.mutate({ id, status })} />
             <button type="button" onClick={() => setPeopleOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-foreground" data-testid="button-add-people-page">
