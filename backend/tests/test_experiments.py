@@ -124,3 +124,15 @@ def test_owner_vs_collaborator_rights(app):
     assert b.patch(f"/api/notes/{theirs['id']}", json={"text": "x"}).status_code == 403
     assert a.patch(f"/api/notes/{mine['id']}", json={"text": "owner edits"}).status_code == 200            # the owner can edit any note
     assert b.delete(f"/api/notes/{theirs['id']}").status_code == 403
+
+
+def test_list_includes_the_note_trace_and_kind_counts(tmp_path):
+    from helpers import make_app, make_exp, new_client
+    c = new_client(make_app(tmp_path), "trace@x.com")
+    e = make_exp(c)
+    for text, kind in [("seen", "observation"), ("maybe", "hypothesis"), ("do it", "decision"), ("again", "observation")]:
+        assert c.post(f"/api/experiments/{e['id']}/notes", json={"text": text, "kind": kind}).status_code == 201
+    item = c.get("/api/experiments").json()["items"][0]
+    assert [m["kind"] for m in item["trace"]] == ["observation", "hypothesis", "decision", "observation"]
+    assert all(m["at"] for m in item["trace"])
+    assert item["kind_counts"] == {"observation": 2, "hypothesis": 1, "decision": 1}
