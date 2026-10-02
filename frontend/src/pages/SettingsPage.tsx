@@ -1,8 +1,8 @@
 import { Check, KeyRound, Moon, SlidersHorizontal, Sun, TestTube2 } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Avatar } from '@/components/common/Avatar';
 import { CopyButton } from '@/components/common/CopyButton';
+import { DeleteAccountSection, PasswordSection, ProfileSection } from '@/components/settings/AccountSections';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -34,20 +34,7 @@ export default function SettingsPage() {
       <h1 className="mt-3 text-3xl font-semibold tracking-[-.055em]">{t.settings}</h1>
       <p className="mt-2 text-sm text-muted-foreground">{t.settingsSub}</p>
       <div className="mt-9 overflow-hidden surface">
-        {user && (
-          <div className="flex items-start gap-4 border-b border-border p-5 sm:p-7">
-            <Avatar person={user} size={40} />
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold">{t.profile}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">{user.name}{user.lab ? ` · ${user.lab}` : ''}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <code className="rounded-lg bg-muted px-2.5 py-1.5 font-mono text-xs tracking-wider" dir="ltr" data-testid="settings-user-id">{user.id}</code>
-                <CopyButton value={user.id} testId="button-copy-user-id-settings" />
-              </div>
-            </div>
-          </div>
-        )}
+        {user && <ProfileSection key={user.id} user={user} />}
         <div className="border-b border-border p-5 sm:p-7">
           <div className="flex items-center gap-3">
             <Sun size={17} className="text-primary" />
@@ -103,6 +90,8 @@ export default function SettingsPage() {
             {tokenError && <p className="mt-2 text-xs font-semibold text-destructive" role="alert">{tokenError}</p>}
           </div>
         </div>
+        {user && <PasswordSection />}
+        {user && <DeleteAccountSection />}
         <div className="p-5 sm:p-7">
           <div className="flex items-center gap-3">
             <TestTube2 size={17} className="text-primary" />

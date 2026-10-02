@@ -5,7 +5,7 @@ import { Avatar } from '@/components/common/Avatar';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useAddCollaborator, useRecentCollaborators } from '@/hooks/queries';
+import { useAddCollaborator, useRecentCollaborators, useRemoveCollaborator } from '@/hooks/queries';
 import { api, ApiError } from '@/lib/api';
 import { fill } from '@/lib/format';
 import type { Experiment, Person } from '@/lib/types';
@@ -31,6 +31,28 @@ function PersonRow({ person, action, testId }: { person: Person; action: React.R
       </div>
       {action}
     </li>
+  );
+}
+
+/** Owner only: remove a collaborator, after a one-line confirm. */
+function RemoveButton({ experiment, person }: { experiment: Experiment; person: Person }) {
+  const { t } = usePreferences();
+  const [asking, setAsking] = useState(false);
+  const remove = useRemoveCollaborator(experiment.id);
+  if (!asking)
+    return (
+      <button type="button" onClick={() => setAsking(true)} className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition hover:border-destructive/50 hover:text-destructive" data-testid={`button-remove-${person.id}`}>
+        {t.removePerson}
+      </button>
+    );
+  return (
+    <span className="flex flex-col items-end gap-1" data-testid={`confirm-remove-${person.id}`}>
+      <span className="text-[10px] font-semibold text-destructive">{remove.isError ? t.actionFailed : fill(t.removePersonAsk, { name: person.name })}</span>
+      <span className="flex gap-1">
+        <button type="button" disabled={remove.isPending} onClick={() => remove.mutate(person.id)} className="rounded-md bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground disabled:opacity-50" data-testid={`button-confirm-remove-${person.id}`}>{t.removePerson}</button>
+        <button type="button" disabled={remove.isPending} onClick={() => { remove.reset(); setAsking(false); }} className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">{t.cancel}</button>
+      </span>
+    </span>
   );
 }
 
@@ -129,7 +151,7 @@ export function AddPeopleDialog({ experiment, open, onOpenChange }: { experiment
           <h3 className="text-xs font-semibold">{t.withAccess}</h3>
           <ul className="mt-2 space-y-2" data-testid="people-with-access">
             <PersonRow person={experiment.owner} testId="access-owner" action={<span className="text-[11px] font-semibold text-muted-foreground">{t.owner}</span>} />
-            {experiment.collaborators.map((p) => <PersonRow key={p.id} person={p} testId={`access-${p.id}`} action={null} />)}
+            {experiment.collaborators.map((p) => <PersonRow key={p.id} person={p} testId={`access-${p.id}`} action={experiment.role === 'owner' ? <RemoveButton experiment={experiment} person={p} /> : null} />)}
           </ul>
         </section>
       </DialogContent>

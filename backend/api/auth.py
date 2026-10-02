@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from api.deps import COOKIE, current_user, db, settings
+from services import mailer
 from services import users as users_service
 from services.users import UserError
 
@@ -32,6 +33,34 @@ class LoginIn(BaseModel):
 class TokenIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: str = Field(default="laptop bridge", max_length=60)
+
+
+class ProfileIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = None
+    lab: str | None = None
+
+
+class PasswordIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str
+    new_password: str
+
+
+class ForgotIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: str = Field(max_length=254)
+
+
+class ResetIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    token: str = Field(min_length=10, max_length=200)
+    new_password: str
+
+
+class DeleteAccountIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    password: str
 
 
 def _set_cookie(response: Response, request: Request, token: str, remember: bool) -> None:
@@ -108,3 +137,69 @@ def api_token(body: TokenIn, request: Request, user=Depends(current_user)):
     if request.headers.get("authorization"):
         raise HTTPException(403, "create tokens from a browser login, not with another token")
     return {"token": users_service.create_api_token(db(request), user["id"], body.label), "label": body.label}
+
+
+# ------------------------------------------------------------- own account
+@router.patch("/me")
+def update_me(body: ProfileIn, request: Request, user=Depends(current_user)):
+    try:
+        row = users_service.update_profile(db(request), user["id"], body.model_dump(exclude_unset=True))
+    except UserError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"user": users_service.public(row)}
+
+
+@router.post("/password")
+def change_password(body: PasswordIn, request: Request, user=Depends(current_user)):
+    """Needs the current password. Other browsers are signed out; this one stays signed in."""
+    if request.headers.get("authorization"):
+        raise HTTPException(403, "change the password from a browser login, not with an API token")
+    try:
+        users_service.change_password(db(request), user, body.current_password, body.new_password, request.cookies.get(COOKIE))
+    except UserError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"ok": True}
+
+
+@router.post("/forgot")
+def forgot_password(body: ForgotIn, request: Request):
+    """E-mails a one-time reset link. Always answers the same, so it never reveals whether an address has an account."""
+    d, st = db(request), settings(request)
+    key = "forgot|" + _throttle_key(request, body.email)
+    _check_throttle(request, key)
+    request.app.state.login_fails.setdefault(key, []).append(time.monotonic())   # at most MAX_FAILS requests per window
+    row = d.one("SELECT * FROM users WHERE email=?", (body.email.strip().lower(),))
+    if row is not None and not row["is_demo"]:
+        token = users_service.create_reset_token(d, row["id"], st.reset_minutes)
+        base = st.public_url or str(request.base_url).rstrip("/")
+        link = f"{base}/reset-password?token={token}"
+        mailer.send(st, row["email"], "MindTrace: reset your password",
+                    f"Hello {row['name']},\n\nUse this link to choose a new password (valid for {st.reset_minutes} minutes):\n{link}\n\n"
+                    "If you did not ask for this, you can ignore this e-mail.\n\n"
+                    f"مرحباً {row['name']}،\nاستخدم الرابط أعلاه لاختيار كلمة مرور جديدة. إذا لم تطلب ذلك فتجاهل هذه الرسالة.\n")
+    return {"ok": True, "email_configured": st.email_configured}
+
+
+@router.post("/reset")
+def reset_password(body: ResetIn, request: Request, response: Response):
+    """Sets the new password from the e-mailed link and signs this browser in."""
+    d, st = db(request), settings(request)
+    try:
+        row = users_service.reset_password(d, body.token, body.new_password)
+    except UserError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    _set_cookie(response, request, users_service.start_session(d, row["id"], st.session_days), True)
+    return {"user": users_service.public(row)}
+
+
+@router.delete("/me")
+def delete_me(body: DeleteAccountIn, request: Request, response: Response, user=Depends(current_user)):
+    """Deletes the account for good (password required)."""
+    if request.headers.get("authorization"):
+        raise HTTPException(403, "delete the account from a browser login, not with an API token")
+    try:
+        users_service.delete_account(db(request), user, body.password, settings(request).audio_dir)
+    except UserError as exc:
+        raise HTTPException(403 if "demo" in str(exc) else 422, str(exc)) from exc
+    response.delete_cookie(COOKIE, path="/")
+    return {"ok": True}
