@@ -1,4 +1,4 @@
-import type { Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, LibraryNote } from './types';
+import type { Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, LibraryNote, Team, TeamDetail, InvitePreview } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -75,7 +75,20 @@ export const api = {
     return get<{ items: Experiment[] }>(`/experiments${qs.size ? `?${qs}` : ''}`).then((r) => r.items);
   },
   getExperiment: (id: string) => get<Experiment>(`/experiments/${encodeURIComponent(id)}`),
-  createExperiment: (title: string, summary: string) => post<Experiment>('/experiments', { title, summary }),
+  createExperiment: (title: string, summary: string, teamId?: string | null) => post<Experiment>('/experiments', teamId ? { title, summary, team_id: teamId } : { title, summary }),
+  shareWithTeam: (id: string, teamId: string | null) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, { team_id: teamId }),
+
+  listTeams: () => get<{ items: Team[] }>('/teams').then((r) => r.items),
+  createTeam: (name: string) => post<TeamDetail>('/teams', { name }),
+  getTeam: (id: string) => get<TeamDetail>(`/teams/${encodeURIComponent(id)}`),
+  renameTeam: (id: string, name: string) => patch<TeamDetail>(`/teams/${encodeURIComponent(id)}`, { name }),
+  deleteTeam: (id: string) => del(`/teams/${encodeURIComponent(id)}`),
+  addTeamMember: (id: string, identifier: string, role: 'member' | 'supervisor') => post<TeamDetail>(`/teams/${encodeURIComponent(id)}/members`, { identifier, role }),
+  setTeamRole: (id: string, personId: string, role: 'member' | 'supervisor') => patch<TeamDetail>(`/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(personId)}`, { role }),
+  removeTeamMember: (id: string, personId: string) => del(`/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(personId)}`),
+  resetInvite: (id: string) => post<TeamDetail>(`/teams/${encodeURIComponent(id)}/invite`),
+  previewInvite: (token: string) => get<InvitePreview>(`/invites/${encodeURIComponent(token)}`),
+  acceptInvite: (token: string) => post<TeamDetail>(`/invites/${encodeURIComponent(token)}/accept`),
   setStatus: (id: string, status: Status) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, { status }),
   updateExperiment: (id: string, fields: { title?: string; summary?: string }) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, fields),
 
