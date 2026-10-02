@@ -1,4 +1,4 @@
-import { LayoutDashboard, MessageSquareHeart, Settings, X } from 'lucide-react';
+import { AudioLines, FlaskConical, LayoutDashboard, Lightbulb, MessageSquareHeart, Settings, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { FeedbackDialog } from '@/components/layout/FeedbackDialog';
@@ -19,6 +19,9 @@ export function Sidebar() {
   const active = useExperiments({ status: 'Active', sort: 'newest' });
   const nav = [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, id: 'dashboard' },
+    { href: '/experiments', label: t.navExperiments, icon: FlaskConical, id: 'experiments' },
+    { href: '/hypotheses', label: t.hypothesesTitle, icon: Lightbulb, id: 'hypotheses' },
+    { href: '/recordings', label: t.navRecordings, icon: AudioLines, id: 'recordings' },
   ];
   const slide = mobileNavOpen ? 'translate-x-0' : rtl ? 'translate-x-full' : '-translate-x-full';
   return (
@@ -44,11 +47,11 @@ export function Sidebar() {
         <div className="mt-10 w-[218px] px-2">
           <span className="text-[11px] font-semibold text-sidebar-muted">{t.workspaceLabel}</span>
           <nav className="mt-3 space-y-1">
-            {nav.map(({ href, label, icon: Icon, id }, index) => (
-              <Link key={id} href={href} onClick={closeMobileNav} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${location === href && index === 0 ? 'bg-sidebar-active font-semibold text-white' : 'text-sidebar-foreground/80 hover:bg-sidebar-active hover:text-white'}`} data-testid={`link-nav-${id}`}>
+            {nav.map(({ href, label, icon: Icon, id }) => (
+              <Link key={id} href={href} onClick={closeMobileNav} aria-current={location === href ? 'page' : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${location === href ? 'bg-sidebar-active font-semibold text-white' : 'text-sidebar-foreground/80 hover:bg-sidebar-active hover:text-white'}`} data-testid={`link-nav-${id}`}>
                 <Icon size={16} />
                 <span>{label}</span>
-                {index === 0 && <span className="ms-auto h-1.5 w-1.5 rounded-full bg-sidebar-accent" />}
+                {location === href && <span className="ms-auto h-1.5 w-1.5 rounded-full bg-sidebar-accent" />}
               </Link>
             ))}
           </nav>
