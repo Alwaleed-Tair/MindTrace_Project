@@ -19,6 +19,7 @@ import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
 import { clockTime, fill, relativeTime } from '@/lib/format';
 import { kindLabel } from '@/lib/report';
+import { takePendingNote } from '@/lib/jump';
 import type { Experiment, Note } from '@/lib/types';
 
 type Tab = 'overview' | 'insights';
@@ -61,6 +62,12 @@ function Detail({ experiment }: { experiment: Experiment }) {
     }
     dictation.toggle();
   };
+  // opened from the Hypotheses or Recordings page: go straight to that note
+  useEffect(() => {
+    const id = takePendingNote();
+    if (id !== null) jumpTo(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState(false);

@@ -60,6 +60,11 @@ export interface Experiment {
   kind_counts?: Record<NoteKind, number>;
 }
 
+/** A note listed outside its experiment (Hypotheses and Recordings pages), with the experiment it belongs to. */
+export interface LibraryNote extends Note {
+  experiment: { id: string; code: string; title: string; status: Status };
+}
+
 export interface TraceMark {
   at: string;
   kind: NoteKind;
