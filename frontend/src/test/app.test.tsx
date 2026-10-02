@@ -418,33 +418,40 @@ describe('originality from scholarly papers', () => {
   });
 });
 
-describe('AI text follows the interface language without spending tokens', () => {
-  it('asks for the insights in the current language, never regenerates by itself, and offers a one-time translation', async () => {
+describe('AI text follows the interface language automatically (one cached translation, no regeneration)', () => {
+  it('translates by itself once when the language differs, and never regenerates', async () => {
     signedIn();
     A.getExperiment.mockResolvedValue(exp());
     A.insights.mockResolvedValue({ ...insightsOf({}, 'ar'), needs_translation: true });
     A.translateInsights.mockResolvedValue(insightsOf({}, 'en'));
-    A.refreshInsights.mockResolvedValue({ status: 'queued' });
     renderApp('/experiments/1');
-    await screen.findByTestId('card-originality');
-    await userEvent.click(await screen.findByTestId('tab-insights'));
-    expect(A.insights).toHaveBeenCalledWith('1', 'en');
-    expect(await screen.findByTestId('translate-banner')).toBeInTheDocument();
-    expect(A.refreshInsights).not.toHaveBeenCalled();
-    expect(A.translateInsights).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByTestId('button-translate-insights'));
     await waitFor(() => expect(A.translateInsights).toHaveBeenCalledWith('1', 'en'));
+    await new Promise((r) => setTimeout(r, 60));
+    expect(A.translateInsights).toHaveBeenCalledTimes(1);
     expect(A.refreshInsights).not.toHaveBeenCalled();
   });
 
-  it('no banner when the analysis is already in the interface language', async () => {
+  it('a failed translation is not retried by itself; the banner offers a retry', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.insights.mockResolvedValue({ ...insightsOf({}, 'ar'), needs_translation: true });
+    A.translateInsights.mockRejectedValue(new ApiError(502, 'boom'));
+    renderApp('/experiments/1');
+    await waitFor(() => expect(A.translateInsights).toHaveBeenCalledTimes(1));
+    await userEvent.click(await screen.findByTestId('tab-insights'));
+    await userEvent.click(await screen.findByTestId('button-translate-insights'));
+    await waitFor(() => expect(A.translateInsights).toHaveBeenCalledTimes(2));
+  });
+
+  it('does nothing when the text is already in the interface language', async () => {
     signedIn();
     A.getExperiment.mockResolvedValue(exp());
     A.insights.mockResolvedValue({ ...insightsOf({}, 'en'), needs_translation: false });
     renderApp('/experiments/1');
-    await userEvent.click(await screen.findByTestId('tab-insights'));
-    await screen.findByTestId('insights-originality');
-    expect(screen.queryByTestId('translate-banner')).toBeNull();
+    await screen.findByTestId('card-originality');
+    await new Promise((r) => setTimeout(r, 60));
+    expect(A.translateInsights).not.toHaveBeenCalled();
+    expect(A.refreshInsights).not.toHaveBeenCalled();
   });
 });
 
@@ -575,5 +582,81 @@ describe('voice note (dictation)', () => {
     renderApp('/experiments/1');
     expect(await screen.findByTestId('dictation-message')).toHaveTextContent('Chrome or Edge');
     expect(screen.getByTestId('button-dictate')).toBeDisabled();
+  });
+});
+
+
+const mine = (id: number, text: string, over = {}) => ({ id, text, kind: 'observation' as const, source: 'manual' as const, text_source: 'human' as const, time_label: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true, ...over });
+
+describe('edit and delete a note', () => {
+  it('edits a note in place and saves it', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ notes: [mine(5, 'first draft')] }));
+    A.updateNote.mockResolvedValue(mine(5, 'better text'));
+    renderApp('/experiments/1');
+    await userEvent.click(await screen.findByTestId('note-edit-5'));
+    const box = screen.getByTestId('note-edit-text-5');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'better text');
+    await userEvent.click(screen.getByTestId('note-edit-save-5'));
+    await waitFor(() => expect(A.updateNote).toHaveBeenCalledWith(5, 'better text'));
+    await waitFor(() => expect(screen.queryByTestId('note-editor-5')).toBeNull());
+  });
+
+  it('cancel keeps the text, and an empty text cannot be saved', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ notes: [mine(5, 'keep me')] }));
+    renderApp('/experiments/1');
+    await userEvent.click(await screen.findByTestId('note-edit-5'));
+    await userEvent.clear(screen.getByTestId('note-edit-text-5'));
+    expect(screen.getByTestId('note-edit-save-5')).toBeDisabled();
+    await userEvent.click(screen.getByTestId('note-edit-cancel-5'));
+    expect(A.updateNote).not.toHaveBeenCalled();
+    expect(screen.getByTestId('note-5')).toHaveTextContent('keep me');
+  });
+
+  it('asks before deleting, then deletes', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ notes: [mine(5, 'remove me'), mine(6, 'stay')] }));
+    A.deleteNote.mockResolvedValue(undefined);
+    renderApp('/experiments/1');
+    await userEvent.click(await screen.findByTestId('note-delete-5'));
+    expect(A.deleteNote).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId('note-delete-cancel-5'));
+    await userEvent.click(screen.getByTestId('note-delete-5'));
+    await userEvent.click(screen.getByTestId('note-delete-confirm-5'));
+    await waitFor(() => expect(A.deleteNote).toHaveBeenCalledWith(5));
+  });
+
+  it('somebody else\'s note has no edit or delete for a collaborator', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ role: 'editor', owner: omar, notes: [mine(5, 'not yours', { can_edit: false, author: omar })] }));
+    renderApp('/experiments/1');
+    await screen.findByTestId('note-5');
+    expect(screen.queryByTestId('note-edit-5')).toBeNull();
+    expect(screen.queryByTestId('note-delete-5')).toBeNull();
+  });
+
+  it('notes the AI left out as unrelated are marked', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ notes: [mine(5, 'random chatter'), mine(6, 'real work')] }));
+    A.insights.mockResolvedValue(insightsOf({ ignored_note_ids: [5] }, 'en'));
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('note-ignored-5')).toBeInTheDocument();
+    expect(screen.queryByTestId('note-ignored-6')).toBeNull();
+  });
+});
+
+describe('dictation errors are specific', () => {
+  it('a speech-service network error says what to do', async () => {
+    class Failing { lang = ''; continuous = false; interimResults = false; onresult = null; onend: (() => void) | null = null; onerror: ((e: { error: string }) => void) | null = null;
+      start() { setTimeout(() => { this.onerror?.({ error: 'network' }); this.onend?.(); }, 0); } stop() { this.onend?.(); } }
+    (window as unknown as Record<string, unknown>).webkitSpeechRecognition = Failing;
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    renderApp('/experiments/1');
+    await userEvent.click(await screen.findByTestId('button-dictate'));
+    expect(await screen.findByTestId('dictation-message')).toHaveTextContent('speech service');
+    delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
   });
 });

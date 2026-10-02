@@ -71,10 +71,13 @@ def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: se
     if audio_files is None:
         audio_files = audio_files_of(db, n["experiment_id"])
     first_session = (db.one("SELECT session_id FROM experiments WHERE id=?", (n["experiment_id"],)) or {"session_id": None})["session_id"]
+    asr = meta.get("asr")
+    if asr and n["text_source"] == "human" and asr.get("needs_review"):          # a person already corrected it: nothing left to review
+        asr = {**asr, "needs_review": False}
     return {"id": n["id"], "text": n["text"], "kind": n["kind"], "source": n["source"], "text_source": n["text_source"],
             "time_label": n["time_label"], "created_at": n["created_at"], "updated_at": n["updated_at"],
             "author": public(author, include_email=False) if author else None,
-            "asr": meta.get("asr"), "speaker_check": meta.get("speaker_check"), "audio_file": meta.get("audio_file"),
+            "asr": asr, "speaker_check": meta.get("speaker_check"), "audio_file": meta.get("audio_file"),
             "has_audio": bool(meta.get("audio_file")) and (meta.get("session_id") or first_session, meta.get("audio_file")) in audio_files,
             "can_edit": n["author_id"] == user_id or owner_id == user_id}
 

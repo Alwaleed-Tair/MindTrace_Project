@@ -9,11 +9,11 @@ import { StatusActions } from '@/components/dashboard/StatusActions';
 import { AddNoteCard, NOTE_TEXTAREA_ID } from '@/components/experiment/AddNoteCard';
 import { EditDetails } from '@/components/experiment/EditDetails';
 import { ExportMenu } from '@/components/experiment/ExportMenu';
-import { InsightsTab, OriginalityCard } from '@/components/experiment/InsightsPanels';
+import { InsightsTab, OriginalityCard, useAutoTranslate } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useAddNote, useExperiment, useSetStatus } from '@/hooks/queries';
+import { useAddNote, useExperiment, useInsights, useSetStatus } from '@/hooks/queries';
 import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
@@ -43,6 +43,8 @@ function Detail({ experiment }: { experiment: Experiment }) {
   const dictation = useDictation(language === 'ar' ? 'ar-SA' : 'en-US', (text) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text)));
   const recording = dictation.listening;
   const addNote = useAddNote(experiment.id);
+  const translate = useAutoTranslate(experiment.id);
+  const ignoredIds = useInsights(experiment.id).data?.result?.ignored_note_ids;
   const wasListening = useRef(false);
   // pressing stop saves what was said as a note (it can still be edited afterwards from the timeline)
   useEffect(() => {
@@ -154,7 +156,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
           </div>
           {/* the Notes timeline is the wide main column; Add Note is the narrow one */}
           <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,.9fr)]">
-            <NotesTimeline experimentId={experiment.id} notes={notes} showAuthors={shared} />
+            <NotesTimeline experimentId={experiment.id} notes={notes} showAuthors={shared} ignoredIds={ignoredIds} />
             <aside className="space-y-5">
               <AddNoteCard experimentId={experiment.id} text={draft} onText={setDraft} dictation={dictation} />
               <OriginalityCard experiment={experiment} />
@@ -162,7 +164,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
           </div>
         </>
       )}
-      {tab === 'insights' && <InsightsTab experiment={experiment} />}
+      {tab === 'insights' && <InsightsTab experiment={experiment} translate={translate} />}
 
       {setStatus.isError && <p className="mt-4 text-xs font-semibold text-destructive" role="alert">{t.statusUpdateFailed}</p>}
       {deleteOpen && <DeleteExperimentDialog experiment={experiment} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => navigate('/dashboard')} />}

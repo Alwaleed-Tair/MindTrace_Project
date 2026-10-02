@@ -109,3 +109,25 @@ def test_what_was_uploaded_is_remembered_per_server_and_account():
     a = br.state_key("http://one:8000", "mt_aaa")
     assert a == br.state_key("http://one:8000/", "mt_aaa")
     assert a != br.state_key("http://two:8000", "mt_aaa") and a != br.state_key("http://one:8000", "mt_bbb")
+
+
+def test_setup_logs_in_once_saves_a_token_and_never_the_password(tmp_path):
+    app = make_app(tmp_path / "srv")
+    new_client(app, "setup@x.com", "Setup User")
+    f = tmp_path / ".bridge_token"
+    c = TestClient(app, base_url="http://platform.test")
+    try:
+        br.setup_token(c, "http://platform.test", "setup@x.com", "wrong-password-1", f)
+        raise AssertionError("a wrong password must fail")
+    except RuntimeError:
+        assert not f.exists()
+    token = br.setup_token(TestClient(app, base_url="http://platform.test"), "http://platform.test", "setup@x.com", "correct-horse-1", f)
+    assert token.startswith("mt_") and "correct-horse-1" not in f.read_text()
+    assert br.load_saved_token("http://platform.test/", f) == token             # used next time, without typing anything
+    assert br.load_saved_token("http://other:8000", f) == ""                    # a token for another platform is not reused
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    make_session_folder(sessions, "s1")
+    state, log = {}, []
+    br.run_once(TestClient(app), "http://testserver", sessions, state, True, token, say=log.append)
+    assert state["s1"]["session_id"] == "s1"                                     # the saved token really uploads

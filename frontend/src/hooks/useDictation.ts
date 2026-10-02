@@ -18,7 +18,7 @@ function getCtor(): RecognitionCtor | undefined {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-export type DictationError = 'denied' | 'failed' | null;
+export type DictationError = 'denied' | 'network' | 'nomic' | 'failed' | null;
 
 /** Speech to text in the browser. Final phrases are handed to `onText`; the phrase being spoken is `interim`. */
 export function useDictation(lang: string, onText: (text: string) => void) {
@@ -56,8 +56,8 @@ export function useDictation(lang: string, onText: (text: string) => void) {
       setInterim(live);
     };
     r.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setError('denied'); want.current = false; }
-      else if (e.error !== 'no-speech' && e.error !== 'aborted') { setError('failed'); want.current = false; }
+      const code: DictationError | undefined = e.error === 'not-allowed' ? 'denied' : e.error === 'service-not-allowed' || e.error === 'network' ? 'network' : e.error === 'audio-capture' ? 'nomic' : e.error === 'no-speech' || e.error === 'aborted' ? undefined : 'failed';
+      if (code) { setError(code); want.current = false; }
     };
     r.onend = () => {
       rec.current = null;
