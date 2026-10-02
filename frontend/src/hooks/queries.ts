@@ -84,6 +84,18 @@ export function useUpdateNote(id: string) {
   });
 }
 
+export function useDeleteNote(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (noteId: number) => api.deleteNote(noteId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['experiment', id] });
+      void qc.invalidateQueries({ queryKey: ['experiments'] });
+      void qc.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
 export function useAddCollaborator(id: string) {
   const qc = useQueryClient();
   return useMutation({

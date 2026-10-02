@@ -295,16 +295,14 @@ def test_real_deepseek_insights(make_page, server):
     assert len(summary) > 40
     expect(p.tid("insights-doc-score")).to_contain_text("%")
     expect(p.tid("insights-caveat")).to_be_visible()                 # the novelty estimate says it is not a literature search
-    # switching the interface language never calls the AI by itself: it offers a one-time translation, then remembers it
+    # switching the interface language translates the analysis ONCE by itself (no regeneration), and remembers it
     p.tid("button-toggle-language").click()
-    expect(p.tid("translate-banner")).to_be_visible(timeout=10000)
-    first = p.tid("insights-summary").inner_text()
-    assert first == summary                                            # still the original text, nothing was regenerated
-    p.tid("button-translate-insights").click()
-    expect(p.tid("translate-banner")).to_have_count(0, timeout=90000)
-    assert p.tid("insights-summary").inner_text() != summary
+    expect(p.tid("insights-summary")).not_to_have_text(summary, timeout=90000)
+    expect(p.tid("translate-banner")).to_have_count(0)
     p.tid("button-toggle-language").click()                            # back: instant, from the stored original
     expect(p.tid("insights-summary")).to_have_text(summary)
+    p.tid("button-toggle-language").click()                            # and forth again: still instant, no new call
+    expect(p.tid("insights-summary")).not_to_have_text(summary)
     expect(p.tid("translate-banner")).to_have_count(0)
     p.goto("/dashboard")
     expect(p.tid("card-insights-summary")).to_have_count(0)           # no Insights on the home page
@@ -336,3 +334,26 @@ def test_delete_an_experiment_for_real(make_page, server):
     p.tid("button-delete-experiment").click()
     p.tid("button-confirm-delete").click()
     expect(p.tid("experiments-empty")).to_be_visible()
+
+
+def test_edit_and_delete_a_note(make_page, server):
+    p = make_page()
+    p.register("Dr. Edit", "edit@lab.com")
+    p.create_experiment("Notes to fix", "")
+    p.add_note("first version of the note")
+    note = p.pg.locator("[data-testid^=note-]:has-text('first version')").first
+    nid = note.get_attribute("data-testid").split("-")[-1]
+    p.tid("note-edit-" + nid).click()
+    p.tid("note-edit-text-" + nid).fill("second version")
+    p.tid("note-edit-save-" + nid).click()
+    expect(p.pg.locator("text=second version")).to_be_visible()
+    p.pg.reload()
+    expect(p.pg.locator("text=second version")).to_be_visible()        # saved in the database
+    p.tid("note-delete-" + nid).click()
+    p.tid("note-delete-cancel-" + nid).click()
+    expect(p.pg.locator("text=second version")).to_be_visible()        # cancel keeps it
+    p.tid("note-delete-" + nid).click()
+    p.tid("note-delete-confirm-" + nid).click()
+    expect(p.tid("notes-empty")).to_be_visible()
+    p.pg.reload()
+    expect(p.tid("notes-empty")).to_be_visible()

@@ -8,6 +8,7 @@ data/
 *.sqlite3-shm
 bridge/config.py
 bridge/.bridge_state.json
+bridge/.bridge_token
 
 # build / tooling
 __pycache__/

@@ -235,3 +235,39 @@ def test_translation_needs_an_analysis_a_valid_language_and_membership(tmp_path)
     assert u.post(f"/api/experiments/{eid}/insights/translate?language=fr").status_code == 422
     stranger = new_client(app, "s@x.com", "Stranger")
     assert stranger.post(f"/api/experiments/{eid}/insights/translate?language=en").status_code == 404
+
+
+def test_off_topic_notes_are_reported_and_cannot_drive_originality(tmp_path):
+    seen = {"analysis": None}
+
+    def handler(req: httpx.Request):
+        body = json.loads(req.content)
+        sysmsg = body["messages"][0]["content"]
+        if "Translate the values" in sysmsg:
+            return reply({})
+        if "search queries" in sysmsg or "how original" in sysmsg:
+            seen.setdefault("lit_inputs", []).append(body["messages"][1]["content"])
+            return reply({"queries": []})
+        seen["analysis"] = sysmsg
+        return reply(good(ignored_note_ids=[1, 99999]))
+    app, u = setup(tmp_path, handler, ai_auto=False, literature_enabled=True)
+    eid = u.post("/api/experiments", json={"title": "T"}).json()["id"]
+    n1 = u.post(f"/api/experiments/{eid}/notes", json={"text": "lorem ipsum random chatter"}).json()["id"]
+    u.post(f"/api/experiments/{eid}/notes", json={"text": "قسنا الحرارة 25 درجة"})
+    u.post(f"/api/experiments/{eid}/insights?language=ar")
+    res = u.get(f"/api/experiments/{eid}/insights").json()["result"]
+    assert "RELEVANCE" in seen["analysis"] and "ignored_note_ids" in seen["analysis"]
+    assert res["ignored_note_ids"] == [n1] or res["ignored_note_ids"] == [1]            # made-up ids are dropped
+    assert all("lorem ipsum" not in x for x in seen.get("lit_inputs", []))                    # the off-topic note never reaches the paper search
+
+
+def test_a_corrected_recorded_note_stops_asking_for_review(tmp_path):
+    app, u = setup(tmp_path, lambda r: reply(good()), ai_auto=False)
+    from test_sessions import post as post_session, token as tok
+    r = post_session(app, tok(u))
+    eid = r.json()["experiment_id"]
+    notes = u.get(f"/api/experiments/{eid}").json()["notes"]
+    flagged = next(n for n in notes if n["asr"] and n["asr"]["needs_review"])
+    u.patch(f"/api/notes/{flagged['id']}", json={"text": "corrected by me"})
+    after = next(n for n in u.get(f"/api/experiments/{eid}").json()["notes"] if n["id"] == flagged["id"])
+    assert after["text"] == "corrected by me" and after["asr"]["needs_review"] is False

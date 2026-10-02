@@ -58,17 +58,22 @@ DEEPSEEK_API_KEY=مفتاحك
 
 حذف التجربة (زر سلة المهملات في البطاقة أو صفحة التجربة، للمالك فقط) يحذف معها النوتس والتسجيل وملفات الصوت.
 
-## ربط برنامج اللابتوب
-1. من الواجهة: **Settings ← Laptop bridge token ← Create a token** وانسخه (يظهر مرة وحدة).
-2. على اللابتوب:
+## ربط برنامج اللابتوب (الجسر)
+الجسر برنامج منفصل على اللابتوب، ومحتاج "مفتاح" يعرّفه إن الجلسات حقتك أنت. المفتاح اسمه **token**: ثابت لحسابك، ما يتغير من نفسه، ويظل شغّال لين تحذفه أو تمسح قاعدة البيانات.
+
+**مرة وحدة بس** (يسأل عن بريدك وكلمة مرورك في المنصة، ويحفظ المفتاح في `bridge/.bridge_token`، وكلمة المرور ما تُحفظ):
 ```powershell
 cd bridge
 pip install -r requirements.txt
-$env:MINDTRACE_API_TOKEN = "mt_..."
-python mindtrace_bridge.py --sessions-dir ..\..\MindTrace\MindTrace2\sessions
-python mindtrace_bridge.py --watch --sessions-dir ...    # يظل شغال ويرفع كل جلسة تنتهي
+python mindtrace_bridge.py --setup
 ```
-كل جلسة مكتملة تصير **تجربة جديدة** بنوتسها (مع الصوت وقراءة Whisper الثانية للنوتس المشكوك فيها). تُرفع مرة وحدة، وبعدين لو تغيّر `session.json` (بعد `--retranscribe`) تتحدّث نفس التجربة. تقدر تنشئ token بدون واجهة: `python backend/manage.py create-token you@lab.com`.
+وبعدها كل مرة:
+```powershell
+python mindtrace_bridge.py --watch --sessions-dir ..\..\MindTrace\MindTrace2\sessions
+```
+مع `--watch` يظل شغّال ويرفع كل جلسة تنتهي. بدون `--watch` يرفع الجديد ويطلع. بدائل: نسخ token من **Settings** في المنصة وضبط `$env:MINDTRACE_API_TOKEN`، أو `python backend/manage.py create-token you@lab.com`.
+
+كل جلسة مكتملة تصير **تجربة** بنوتسها وصوتها وقراءة Whisper الثانية. وإذا العنوان المنطوق يطابق تجربة عندك تكمل عليها. تُرفع مرة وحدة، وتتحدّث نفس التجربة لو تغيّر `session.json` (بعد `--retranscribe`).
 
 ## الاختبارات
 ```powershell

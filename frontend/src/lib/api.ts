@@ -75,6 +75,7 @@ export const api = {
 
   addNote: (id: string, text: string, kind: NoteKind = 'observation') => post<Note>(`/experiments/${encodeURIComponent(id)}/notes`, { text, kind }),
   updateNote: (noteId: number, text: string) => patch<Note>(`/notes/${noteId}`, { text }),
+  deleteNote: (noteId: number) => del(`/notes/${noteId}`),
 
   searchUsers: (q: string) => get<{ items: Person[] }>(`/users/search?q=${encodeURIComponent(q)}`).then((r) => r.items),
   recentCollaborators: () => get<{ items: Person[] }>('/collaborators/recent').then((r) => r.items),

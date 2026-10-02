@@ -20,7 +20,7 @@ const colorClass: Record<string, string> = {
 const stateClass: Record<Status, string> = {
   Active: '',
   Paused: '!border-amber-400/50 !bg-amber-50/60 dark:!bg-amber-950/20',
-  Completed: '!bg-muted/40',
+  Completed: '!border-primary/45 !bg-primary/[.07]',
 };
 
 export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experiment; onSetStatus: (id: string, status: Status) => void }) {

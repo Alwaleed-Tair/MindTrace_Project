@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ExternalLink, Languages, Lightbulb, RefreshCw, Sparkles } from 'lucide-react';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useInsights, useRefreshInsights, useTranslateInsights, useUpdateNote } from '@/hooks/queries';
@@ -95,9 +96,8 @@ export function OriginalityCard({ experiment }: { experiment: Experiment }) {
 }
 
 /** The Insights tab: the DeepSeek review of the experiment. Suggestions only; the researcher accepts or ignores them. */
-export function InsightsTab({ experiment }: { experiment: Experiment }) {
+export function InsightsTab({ experiment, translate }: { experiment: Experiment; translate: ReturnType<typeof useTranslateInsights> }) {
   const { t, language } = usePreferences();
-  const translate = useTranslateInsights(experiment.id);
   const q = useInsights(experiment.id);
   const refresh = useRefreshInsights(experiment.id);
   const update = useUpdateNote(experiment.id);
@@ -117,11 +117,13 @@ export function InsightsTab({ experiment }: { experiment: Experiment }) {
       </div>
       {r && q.data?.needs_translation && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs" data-testid="translate-banner">
-          <span className="text-muted-foreground">{translate.isError ? t.translateFailed : t.translateHint}</span>
-          <button type="button" disabled={translate.isPending} onClick={() => translate.mutate(language)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground disabled:opacity-50" data-testid="button-translate-insights">
-            <Languages size={13} />
-            {translate.isPending ? t.translating : t.translateNow}
-          </button>
+          <span className="text-muted-foreground">{translate.isError ? t.translateFailed : t.translating}</span>
+          {translate.isError && (
+            <button type="button" onClick={() => translate.mutate(language)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground" data-testid="button-translate-insights">
+              <Languages size={13} />
+              {t.translateNow}
+            </button>
+          )}
         </div>
       )}
       {r ? (
@@ -129,6 +131,7 @@ export function InsightsTab({ experiment }: { experiment: Experiment }) {
           <div className="surface p-6 md:col-span-2">
             <div className="flex items-center gap-2 text-primary"><Sparkles size={17} /><h3 className="text-sm font-semibold">{t.signalSummary}</h3></div>
             <p className="mt-4 whitespace-pre-line text-sm leading-7" dir="auto" data-testid="insights-summary">{r.summary}</p>
+            {(r.ignored_note_ids?.length ?? 0) > 0 && <p className="mt-3 text-[11px] text-muted-foreground" data-testid="insights-ignored">{fill(t.ignoredCount, { n: r.ignored_note_ids!.length })}</p>}
             {(r.key_points?.length ?? 0) > 0 && <><p className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.keyPoints}</p><ul className="mt-1 list-disc space-y-1 ps-5 text-xs leading-6" dir="auto" data-testid="insights-key-points">{r.key_points!.map((s) => <li key={s}>{s}</li>)}</ul></>}
             {(r.next_steps?.length ?? 0) > 0 && <><p className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.nextSteps}</p><ul className="mt-1 list-disc space-y-1 ps-5 text-xs leading-6" dir="auto" data-testid="insights-next-steps">{r.next_steps!.map((s) => <li key={s}>{s}</li>)}</ul></>}
           </div>
@@ -179,4 +182,22 @@ export function InsightsTab({ experiment }: { experiment: Experiment }) {
       )}
     </div>
   );
+}
+
+/** When the interface language differs from the analysis' language, translate it once (one short call, then kept on the server).
+ *  Switching back and forth afterwards is free. A failed attempt is not repeated by itself: the banner offers a retry. */
+export function useAutoTranslate(experimentId: string) {
+  const { language } = usePreferences();
+  const q = useInsights(experimentId);
+  const translate = useTranslateInsights(experimentId);
+  const tried = useRef<string | null>(null);
+  const want = q.data?.status === 'done' && q.data.ai_configured && q.data.needs_translation;
+  useEffect(() => {
+    if (!want || translate.isPending) return;
+    const key = `${language}|${q.data?.updated_at}`;
+    if (tried.current === key) return;
+    tried.current = key;
+    translate.mutate(language);
+  }, [want, language, q.data?.updated_at, translate]);
+  return translate;
 }

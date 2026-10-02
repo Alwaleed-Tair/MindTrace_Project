@@ -12,8 +12,12 @@ remembers what it sent, so a session is uploaded once, and again only if session
 
 It never modifies or deletes anything in the sessions folder. Failures are retried on the next round.
 
-Login: an API token of YOUR platform account. Create it in the web app (Settings -> Laptop bridge token) or with
-`python backend/manage.py create-token you@lab.com`, then set it once:   $env:MINDTRACE_API_TOKEN = "mt_..."
+Login (once): the bridge is a separate program, so it needs its own key to your account (a "token"). The easy way:
+
+    python mindtrace_bridge.py --setup            # asks your platform email + password once, saves a token in .bridge_token
+
+After that just run it (the saved token is used). Other ways: copy a token from the web app (Settings), or set
+$env:MINDTRACE_API_TOKEN = "mt_...", or `python backend/manage.py create-token you@lab.com`.
 """
 from __future__ import annotations
 
@@ -34,6 +38,7 @@ except ImportError:
 
 HERE = Path(__file__).resolve().parent
 STATE_FILE = HERE / ".bridge_state.json"
+TOKEN_FILE = HERE / ".bridge_token"
 
 
 def cfg(name: str, default):
@@ -55,6 +60,30 @@ def save_state(state: dict, path: Path = STATE_FILE) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=1), encoding="utf-8")
     tmp.replace(path)
+
+
+def load_saved_token(url: str, path: Path = TOKEN_FILE) -> str:
+    """The token saved by --setup, only if it was made for this platform address."""
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return d.get("token", "") if d.get("url", "").rstrip("/") == url.rstrip("/") else ""
+
+
+def setup_token(client: httpx.Client, base_url: str, email: str, password: str, path: Path = TOKEN_FILE) -> str:
+    """Log in with email + password, ask the platform for a token, and save it for next time. The password is never stored."""
+    base = base_url.rstrip("/")
+    h = {"X-Requested-With": "mindtrace"}
+    r = client.post(base + "/api/auth/login", json={"email": email, "password": password, "remember": True}, headers=h, timeout=20)
+    if r.status_code != 200:
+        raise RuntimeError(r.json().get("detail", f"HTTP {r.status_code}") if r.headers.get("content-type", "").startswith("application/json") else f"HTTP {r.status_code}")
+    r = client.post(base + "/api/auth/api-token", json={"label": "laptop bridge"}, headers=h, timeout=20)
+    if r.status_code != 201:
+        raise RuntimeError(f"could not create a token (HTTP {r.status_code})")
+    token = r.json()["token"]
+    path.write_text(json.dumps({"url": base, "token": token}), encoding="utf-8")
+    return token
 
 
 def state_key(url: str, token: str) -> str:
@@ -135,8 +164,21 @@ def main(argv=None) -> int:
     ap.add_argument("--watch", action="store_true", help="keep running and upload new sessions")
     ap.add_argument("--interval", type=float, default=cfg("WATCH_INTERVAL_SEC", 20))
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--setup", action="store_true", help="log in once with your platform email + password and save a token")
     a = ap.parse_args(argv)
-    token = os.environ.get("MINDTRACE_API_TOKEN", "")
+    if a.setup:
+        import getpass
+        email = input("Platform email: ").strip()
+        password = getpass.getpass("Platform password (not shown, not saved): ")
+        try:
+            with httpx.Client() as c:
+                setup_token(c, a.url, email, password)
+        except (httpx.HTTPError, RuntimeError) as exc:
+            print(f"Setup failed: {exc}", file=sys.stderr)
+            return 1
+        print(f"Done. Token saved in {TOKEN_FILE.name}. Now run:  python mindtrace_bridge.py --watch --sessions-dir <sessions folder>")
+        return 0
+    token = os.environ.get("MINDTRACE_API_TOKEN", "") or load_saved_token(a.url)
     sessions_dir = Path(a.sessions_dir)
     if not sessions_dir.is_dir():
         print(f"Sessions folder not found: {sessions_dir}  (use --sessions-dir)", file=sys.stderr)
@@ -154,7 +196,7 @@ def main(argv=None) -> int:
                 if not a.watch:
                     return 1
         if not token and not a.dry_run:
-            print("No API token. Create one in the web app (Settings -> Laptop bridge token) and set MINDTRACE_API_TOKEN.", file=sys.stderr)
+            print("No token yet. Run once:  python mindtrace_bridge.py --setup   (or set MINDTRACE_API_TOKEN).", file=sys.stderr)
             return 2
         while True:
             sent, failed = run_once(client, a.url, sessions_dir, state, with_full, token, a.dry_run)

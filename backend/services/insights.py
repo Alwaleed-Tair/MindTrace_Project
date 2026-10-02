@@ -63,7 +63,9 @@ def run(db: Database, settings: Settings, exp_id: int, client: httpx.Client | No
         return
     result["meta"]["language"] = code
     originality = int(result["novelty"]["score"])
-    result["literature"] = _literature(settings, data, client)
+    ignored = set(result.get("ignored_note_ids", []))
+    on_topic = {**data, "notes": [n for n in data["notes"] if n["id"] not in ignored]}      # off-topic notes do not count for originality either
+    result["literature"] = _literature(settings, on_topic, client)
     if result["literature"]["status"] == "ok":
         originality = result["literature"]["score"]                  # an estimate checked against real papers beats the model's guess
     with db.tx() as c:

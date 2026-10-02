@@ -28,7 +28,7 @@ export function AddNoteCard({ experimentId, text, onText, dictation }: Props) {
       onError: (e) => setError(e instanceof ApiError ? e.message : t.noteSaveFailed),
     });
   };
-  const micMessage = !dictation.supported ? t.micUnsupported : dictation.error === 'denied' ? t.micDenied : dictation.error === 'failed' ? t.micError : null;
+  const micMessage = !dictation.supported ? t.micUnsupported : dictation.error === 'denied' ? t.micDenied : dictation.error === 'network' ? t.micNetwork : dictation.error === 'nomic' ? t.micNoMic : dictation.error === 'failed' ? t.micError : null;
   return (
     <section className="surface p-5" data-testid="card-add-note">
       <div className="flex items-center justify-between">

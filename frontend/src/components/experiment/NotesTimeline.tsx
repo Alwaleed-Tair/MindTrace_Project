@@ -1,7 +1,8 @@
-import { AudioLines, Eye } from 'lucide-react';
+import { AudioLines, Eye, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
+import { useDeleteNote, useUpdateNote } from '@/hooks/queries';
 import { clockTime, fill } from '@/lib/format';
 import type { Note } from '@/lib/types';
 
@@ -11,7 +12,57 @@ function NoteAudio({ experimentId, noteId }: { experimentId: string; noteId: num
   return <audio controls preload="none" className="mt-3 h-8 w-full max-w-sm" src={`/api/experiments/${encodeURIComponent(experimentId)}/notes/${noteId}/audio`} onError={() => setFailed(true)} data-testid={`audio-${noteId}`} />;
 }
 
-export function NotesTimeline({ experimentId, notes, showAuthors, limit }: { experimentId: string; notes: Note[]; showAuthors: boolean; limit?: number }) {
+/** The text of a note, with Edit / Delete for the people allowed to change it (the writer or the experiment owner). */
+function NoteBody({ experimentId, note }: { experimentId: string; note: Note }) {
+  const { t } = usePreferences();
+  const [editing, setEditing] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [text, setText] = useState(note.text);
+  const update = useUpdateNote(experimentId);
+  const remove = useDeleteNote(experimentId);
+  const save = () => {
+    const value = text.trim();
+    if (!value || update.isPending) return;
+    if (value === note.text) return setEditing(false);
+    update.mutate({ noteId: note.id, text: value }, { onSuccess: () => setEditing(false) });
+  };
+  if (editing) {
+    return (
+      <div className="mt-2" data-testid={`note-editor-${note.id}`}>
+        <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} rows={4} maxLength={5000} dir="auto" className="w-full resize-y rounded-xl border border-input bg-background px-3 py-2.5 text-sm leading-6 outline-none focus:border-primary" data-testid={`note-edit-text-${note.id}`} />
+        {update.isError && <p className="mt-1 text-xs font-semibold text-destructive" role="alert">{t.noteEditFailed}</p>}
+        <div className="mt-2 flex gap-2">
+          <button type="button" onClick={save} disabled={!text.trim() || update.isPending} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40" data-testid={`note-edit-save-${note.id}`}>{t.saveNote}</button>
+          <button type="button" onClick={() => { setEditing(false); setText(note.text); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted" data-testid={`note-edit-cancel-${note.id}`}>{t.cancel}</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground/80" dir="auto">{note.text}</p>
+      {note.can_edit && (
+        <div className="mt-1.5 flex items-center gap-1 text-[11px]">
+          {asking ? (
+            <span className="inline-flex items-center gap-2" role="alertdialog" data-testid={`note-delete-ask-${note.id}`}>
+              <span className="text-muted-foreground">{t.deleteNoteAsk}</span>
+              <button type="button" onClick={() => remove.mutate(note.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-2 py-1 font-semibold text-destructive-foreground disabled:opacity-50" data-testid={`note-delete-confirm-${note.id}`}>{t.yes}</button>
+              <button type="button" onClick={() => setAsking(false)} className="rounded-md px-2 py-1 font-semibold text-muted-foreground hover:bg-muted" data-testid={`note-delete-cancel-${note.id}`}>{t.cancel}</button>
+              {remove.isError && <span className="font-semibold text-destructive" role="alert">{t.noteDeleteFailed}</span>}
+            </span>
+          ) : (
+            <>
+              <button type="button" onClick={() => { setText(note.text); setEditing(true); }} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" data-testid={`note-edit-${note.id}`}><Pencil size={11} />{t.editNote}</button>
+              <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive" data-testid={`note-delete-${note.id}`}><Trash2 size={11} />{t.deleteNote}</button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignoredIds }: { experimentId: string; notes: Note[]; showAuthors: boolean; limit?: number; ignoredIds?: number[] }) {
   const { t, language } = usePreferences();
   const shown = limit ? notes.slice(-limit) : notes;
   return (
@@ -36,9 +87,10 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit }: { exp
                   <span className="text-[10px] font-semibold uppercase tracking-[.1em] text-primary" data-testid={`note-kind-${note.id}`}>{note.kind}</span>
                   {note.source === 'recording' && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><AudioLines size={10} />{t.fromRecording}</span>}
                   {note.asr?.needs_review && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300" data-testid={`note-review-${note.id}`}><Eye size={10} />{t.needsReview}</span>}
+                  {ignoredIds?.includes(note.id) && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground" data-testid={`note-ignored-${note.id}`}>{t.ignoredByAi}</span>}
                   {showAuthors && note.author && <span className="ms-auto inline-flex items-center gap-1.5 text-[10px] text-muted-foreground"><Avatar person={note.author} size={18} />{note.author.name}</span>}
                 </div>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground/80" dir="auto">{note.text}</p>
+                <NoteBody experimentId={experimentId} note={note} />
                 {note.asr?.needs_review && note.asr.alternative && (
                   <p className="mt-1.5 rounded-lg bg-muted/70 px-3 py-2 text-xs leading-5 text-muted-foreground" dir="auto" data-testid={`note-alt-${note.id}`}>
                     <span className="font-semibold">{t.secondReading}: </span>

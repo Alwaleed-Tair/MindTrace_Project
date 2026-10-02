@@ -1,8 +1,16 @@
 import type { Language } from './types';
 
 const en = {
+  ignoredByAi: 'Not used in the analysis (unrelated)',
+  ignoredCount: '{n} unrelated note(s) were left out of the analysis.',
+  editNote: 'Edit',
+  deleteNote: 'Delete',
+  deleteNoteAsk: 'Delete this note?',
+  yes: 'Yes, delete',
+  noteEditFailed: 'Could not save the change.',
+  noteDeleteFailed: 'Could not delete the note.',
   origScale: 'Higher is better: 100 means nothing similar was found.',
-  translateHint: 'This analysis is in another language. Translating uses one short AI call and is then kept.',
+  translateHint: 'Translating the analysis…',
   translateNow: 'Translate',
   translating: 'Translating…',
   translateFailed: 'Translation failed. Try again.',
@@ -18,7 +26,9 @@ const en = {
   micListening: 'Listening… speak your note',
   micHint: 'Your words appear in the note box and are saved as a note when you press Stop.',
   micUnsupported: 'Voice input works in Chrome or Edge. You can still type the note.',
-  micDenied: 'Microphone permission was blocked in the browser.',
+  micDenied: 'Microphone permission was blocked in the browser. Click the lock icon next to the address and allow the microphone.',
+  micNetwork: 'The browser could not reach its speech service. Voice input needs Chrome or Edge with an internet connection (Brave and Firefox do not support it).',
+  micNoMic: 'No microphone was found. Plug one in and try again.',
   micError: 'Voice input stopped. Try again.',
   // originality
   origTitle: 'Originality',
@@ -229,8 +239,16 @@ const en = {
 export type Strings = { [K in keyof typeof en]: string };
 
 const ar: Strings = {
+  ignoredByAi: 'لم تُستخدم في التحليل (لا علاقة لها)',
+  ignoredCount: 'تم استبعاد {n} ملاحظة لا علاقة لها بالتجربة من التحليل.',
+  editNote: 'تعديل',
+  deleteNote: 'حذف',
+  deleteNoteAsk: 'حذف هذه الملاحظة؟',
+  yes: 'نعم، احذف',
+  noteEditFailed: 'تعذّر حفظ التعديل.',
+  noteDeleteFailed: 'تعذّر حذف الملاحظة.',
   origScale: 'كلما ارتفعت النسبة كان أفضل: 100 تعني أنه لم يوجد شيء مشابه.',
-  translateHint: 'هذا التحليل بلغة أخرى. الترجمة تستخدم طلب ذكاء اصطناعي قصير واحد ثم تُحفظ.',
+  translateHint: 'جارٍ ترجمة التحليل…',
   translateNow: 'ترجم',
   translating: 'جارٍ الترجمة…',
   translateFailed: 'فشلت الترجمة. حاول مرة ثانية.',
@@ -246,7 +264,9 @@ const ar: Strings = {
   micListening: 'جارٍ الاستماع… تكلّم بملاحظتك',
   micHint: 'كلامك يظهر في خانة الملاحظة. عدّله ثم احفظه.',
   micUnsupported: 'الإدخال الصوتي يعمل في Chrome أو Edge. تقدر تكتب الملاحظة يدوياً.',
-  micDenied: 'تم حظر إذن الميكروفون في المتصفح.',
+  micDenied: 'تم حظر إذن الميكروفون في المتصفح. اضغط أيقونة القفل بجانب العنوان وفعّل الميكروفون.',
+  micNetwork: 'تعذّر على المتصفح الوصول لخدمة التعرّف على الصوت. الإدخال الصوتي يحتاج Chrome أو Edge مع اتصال بالإنترنت (متصفحا Brave وFirefox لا يدعمانه).',
+  micNoMic: 'لم يتم العثور على ميكروفون. وصّل واحداً وحاول مرة ثانية.',
   micError: 'توقف الإدخال الصوتي. حاول مرة ثانية.',
   // originality
   origTitle: 'الأصالة',
