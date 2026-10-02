@@ -11,6 +11,10 @@ import ExperimentPage from '@/pages/ExperimentPage';
 import ExperimentsPage from '@/pages/ExperimentsPage';
 import HypothesesPage from '@/pages/HypothesesPage';
 import RecordingsPage from '@/pages/RecordingsPage';
+import JoinPage from '@/pages/JoinPage';
+import TeamPage from '@/pages/TeamPage';
+import TeamsPage from '@/pages/TeamsPage';
+import { peekPendingInvite, savePendingInvite } from '@/lib/invite';
 import NotFound from '@/pages/not-found';
 import ReportPage from '@/pages/ReportPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
@@ -20,15 +24,24 @@ import SignInPage from '@/pages/SignInPage';
 /** Pages that need a signed-in user: wait for the first check, then either show the page inside the shell or go to the sign-in page. */
 function Private({ children, bare = false }: { children: ReactNode; bare?: boolean }) {
   const { status } = useAuth();
+  const [location] = useLocation();
   if (status === 'loading') return <div className="min-h-[100dvh] bg-background" aria-busy="true" data-testid="auth-loading" />;
-  if (status !== 'authed') return <Redirect to="/" />;
+  if (status !== 'authed') {
+    // an invite link opened while signed out: remember it, and come back to it after signing in
+    const invite = location.match(/^\/join\/([A-Za-z0-9_-]+)/);
+    if (invite) savePendingInvite(invite[1]);
+    return <Redirect to="/" />;
+  }
   return bare ? <>{children}</> : <AppShell>{children}</AppShell>;
 }
 
 function Home() {
   const { status } = useAuth();
   if (status === 'loading') return <div className="min-h-[100dvh] bg-background" aria-busy="true" data-testid="auth-loading" />;
-  if (status === 'authed') return <Redirect to="/dashboard" />;
+  if (status === 'authed') {
+    const invite = peekPendingInvite();
+    return <Redirect to={invite ? `/join/${invite}` : '/dashboard'} />;
+  }
   return <SignInPage />;
 }
 
@@ -44,6 +57,15 @@ function Routes() {
         </Route>
         <Route path="/experiments">
           <Private><ExperimentsPage /></Private>
+        </Route>
+        <Route path="/team">
+          <Private><TeamsPage /></Private>
+        </Route>
+        <Route path="/team/:id">
+          <Private><TeamPage /></Private>
+        </Route>
+        <Route path="/join/:token">
+          <Private><JoinPage /></Private>
         </Route>
         <Route path="/hypotheses">
           <Private><HypothesesPage /></Private>
