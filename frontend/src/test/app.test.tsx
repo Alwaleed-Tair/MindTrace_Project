@@ -162,7 +162,6 @@ describe('dashboard metrics', () => {
     expect(screen.getByTestId('metric-review')).toHaveTextContent('0');
     // the old average originality averaged the default 50 of unanalysed experiments, so it is gone
     expect(screen.queryByTestId('metric-originality')).toBeNull();
-    expect(screen.queryByTestId('link-nav-experiments')).toBeNull();
     expect(screen.queryByTestId('card-insights-summary')).toBeNull();
   });
 
@@ -581,11 +580,16 @@ describe('sidebar extras', () => {
     expect(await screen.findByTestId('experiments-grid')).toBeInTheDocument();
   });
 
-  it('there is no Experiments button in the sidebar', async () => {
+  it('the sidebar leads to All experiments, Hypotheses and Recordings', async () => {
     signedIn();
     renderApp();
     await screen.findByTestId('experiments-grid');
-    expect(screen.queryByTestId('link-nav-experiments')).toBeNull();
+    expect(screen.getByTestId('link-nav-dashboard')).toHaveAttribute('aria-current', 'page');
+    await userEvent.click(screen.getByTestId('link-nav-experiments'));
+    expect(await screen.findByTestId('experiments-page')).toBeInTheDocument();
+    expect(screen.getByTestId('link-nav-experiments')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('link-nav-hypotheses')).toBeInTheDocument();
+    expect(screen.getByTestId('link-nav-recordings')).toBeInTheDocument();
   });
 
   it('Feedback opens a mock form that can be filled and "sent"', async () => {
@@ -728,5 +732,54 @@ describe('the "needs review" badge is only for really uncertain notes', () => {
     expect(screen.getByTestId('note-alt-1')).toBeInTheDocument();
     expect(screen.queryByTestId('note-review-2')).toBeNull();
     expect(screen.queryByTestId('note-alt-2')).toBeNull();
+  });
+});
+
+describe('library pages', () => {
+  const lib = (id: number, over: Record<string, unknown> = {}) => ({ id, text: `note ${id}`, kind: 'hypothesis', source: 'manual', text_source: 'human', time_label: null,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true,
+    experiment: { id: '1', code: 'EXP-1', title: 'Ambient temperature', status: 'Active' }, ...over });
+
+  it('All experiments lists every experiment with status tabs and counts', async () => {
+    signedIn([exp({ id: '1' }), exp({ id: '2', title: 'Second', code: 'EXP-2', status: 'Paused' })]);
+    renderApp('/experiments');
+    expect(await screen.findByTestId('row-experiment-1')).toHaveTextContent('Ambient temperature');
+    expect(screen.getByTestId('row-experiment-2')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-status-paused')).toHaveTextContent('1');
+    await userEvent.click(screen.getByTestId('tab-status-paused'));
+    await waitFor(() => expect(A.listExperiments).toHaveBeenLastCalledWith({ status: 'Paused', q: '', sort: 'newest' }));
+  });
+
+  it('Hypotheses groups them by experiment and opens one at its place', async () => {
+    signedIn();
+    A.listNotes.mockResolvedValue([lib(7, { text: 'airflow matters' }), lib(8, { text: 'humidity matters', experiment: { id: '2', code: 'EXP-2', title: 'Second', status: 'Paused' } })]);
+    A.getExperiment.mockResolvedValue(exp({ notes: [{ ...lib(7, { text: 'airflow matters' }), experiment: undefined }] as never }));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderApp('/hypotheses');
+    await waitFor(() => expect(screen.getByTestId('hypotheses-count')).toHaveTextContent('2 hypotheses across 2 experiments'));
+    expect(A.listNotes).toHaveBeenCalledWith({ kind: 'hypothesis', q: '' });
+    expect(within(screen.getByTestId('hypotheses-group-2')).getByTestId('hypothesis-item-8')).toHaveTextContent('humidity matters');
+    await userEvent.click(screen.getByTestId('hypothesis-item-7'));
+    await screen.findByTestId('experiment-page');
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
+
+  it('Hypotheses says how to start when there are none', async () => {
+    signedIn();
+    A.listNotes.mockResolvedValue([]);
+    renderApp('/hypotheses');
+    expect(await screen.findByTestId('hypotheses-page-empty')).toHaveTextContent('choose "Hypothesis"');
+  });
+
+  it('Recordings lists recorded notes and can show only the uncertain ones', async () => {
+    signedIn();
+    A.listNotes.mockResolvedValue([lib(3, { kind: 'observation', source: 'recording', text_source: 'asr', time_label: '00:25', asr: { language: 'ar', confidence: 0.6, needs_review: true, language_rechecked: false, alternative: null } })]);
+    renderApp('/recordings');
+    expect(await screen.findByTestId('recording-3')).toHaveTextContent('Confidence 60%');
+    expect(screen.getByTestId('recording-review-3')).toBeInTheDocument();
+    expect(A.listNotes).toHaveBeenCalledWith({ source: 'recording', q: '', review: false });
+    await userEvent.click(screen.getByTestId('filter-recordings-review'));
+    await waitFor(() => expect(A.listNotes).toHaveBeenLastCalledWith({ source: 'recording', q: '', review: true }));
   });
 });
