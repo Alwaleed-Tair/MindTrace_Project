@@ -9,15 +9,16 @@ import { PreferencesProvider } from '@/context/PreferencesContext';
 import DashboardPage from '@/pages/DashboardPage';
 import ExperimentPage from '@/pages/ExperimentPage';
 import NotFound from '@/pages/not-found';
+import ReportPage from '@/pages/ReportPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SignInPage from '@/pages/SignInPage';
 
 /** Pages that need a signed-in user: wait for the first check, then either show the page inside the shell or go to the sign-in page. */
-function Private({ children }: { children: ReactNode }) {
+function Private({ children, bare = false }: { children: ReactNode; bare?: boolean }) {
   const { status } = useAuth();
   if (status === 'loading') return <div className="min-h-[100dvh] bg-background" aria-busy="true" data-testid="auth-loading" />;
   if (status !== 'authed') return <Redirect to="/" />;
-  return <AppShell>{children}</AppShell>;
+  return bare ? <>{children}</> : <AppShell>{children}</AppShell>;
 }
 
 function Home() {
@@ -35,6 +36,9 @@ function Routes() {
         <Route path="/" component={Home} />
         <Route path="/dashboard">
           <Private><DashboardPage /></Private>
+        </Route>
+        <Route path="/experiments/:id/report">
+          <Private bare><ReportPage /></Private>
         </Route>
         <Route path="/experiments/:id">
           <Private><ExperimentPage /></Private>
