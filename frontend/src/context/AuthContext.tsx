@@ -13,6 +13,12 @@ interface AuthValue {
   demo: () => Promise<void>;
   logout: () => Promise<void>;
   recheck: () => Promise<void>;
+  /** After editing the profile: show the new name and lab everywhere. */
+  updateUser: (u: Person) => void;
+  /** The e-mailed reset link: set the new password and sign in. */
+  resetPassword: (token: string, password: string) => Promise<void>;
+  /** The account was deleted on the server: forget everything here. */
+  signedOut: () => void;
 }
 
 const Ctx = createContext<AuthValue | null>(null);
@@ -54,6 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (email, password, remember) => enter((await api.login(email, password, remember)).user),
       register: async (name, email, password, lab) => enter((await api.register(name, email, password, lab)).user),
       demo: async () => enter((await api.demo()).user),
+      resetPassword: async (token, password) => enter((await api.resetPassword(token, password)).user),
+      updateUser: (u) => setUser(u),
+      signedOut: () => {
+        qc.clear();
+        setUser(null);
+        setStatus('anon');
+      },
       logout: async () => {
         try {
           await api.logout();

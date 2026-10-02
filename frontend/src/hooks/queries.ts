@@ -141,3 +141,31 @@ export function useDeleteExperiment() {
     },
   });
 }
+
+function useExperimentChanged(id: string) {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['experiment', id] });
+    void qc.invalidateQueries({ queryKey: ['experiments'] });
+    void qc.invalidateQueries({ queryKey: ['stats'] });
+  };
+}
+
+/** Title and summary (owner only; the server checks it too). */
+export function useUpdateExperiment(id: string) {
+  const changed = useExperimentChanged(id);
+  return useMutation({
+    mutationFn: (fields: { title?: string; summary?: string }) => api.updateExperiment(id, fields),
+    onSuccess: changed,
+  });
+}
+
+export function useDeleteNote(id: string) {
+  const changed = useExperimentChanged(id);
+  return useMutation({ mutationFn: (noteId: number) => api.deleteNote(noteId), onSuccess: changed });
+}
+
+export function useRemoveCollaborator(id: string) {
+  const changed = useExperimentChanged(id);
+  return useMutation({ mutationFn: (personId: string) => api.removeCollaborator(id, personId), onSuccess: changed });
+}

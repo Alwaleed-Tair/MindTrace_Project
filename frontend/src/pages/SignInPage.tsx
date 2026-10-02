@@ -4,7 +4,7 @@ import { LanguageToggle } from '@/components/common/LanguageToggle';
 import { Logo } from '@/components/common/Logo';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
-import { ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 
 function Field({ icon: Icon, label, children }: { icon: typeof Mail; label: string; children: React.ReactNode }) {
   return (
@@ -23,7 +23,8 @@ const inputClass = 'min-w-0 flex-1 bg-transparent text-sm outline-none placehold
 export default function SignInPage() {
   const { t, language, dir } = usePreferences();
   const { login, register, demo, status, recheck } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [forgotDone, setForgotDone] = useState<null | { emailConfigured: boolean }>(null);
   const [name, setName] = useState('');
   const [lab, setLab] = useState('');
   const [email, setEmail] = useState('');
@@ -46,6 +47,13 @@ export default function SignInPage() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (mode === 'forgot') {
+      void run(async () => {
+        const r = await api.forgotPassword(email);
+        setForgotDone({ emailConfigured: r.email_configured });
+      });
+      return;
+    }
     void run(() => (mode === 'login' ? login(email, password, remember) : register(name, email, password, lab)));
   };
 
@@ -62,8 +70,8 @@ export default function SignInPage() {
             <div className="mb-8 text-center">
               <div className="mb-6 flex justify-center sm:hidden"><Logo compact /></div>
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-primary">MindTrace / 01</p>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{mode === 'login' ? t.signIn : t.signUp}</h1>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{mode === 'login' ? t.signInSub : t.signUpSub}</p>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{mode === 'login' ? t.signIn : mode === 'forgot' ? t.forgotTitle : t.signUp}</h1>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{mode === 'login' ? t.signInSub : mode === 'forgot' ? t.forgotSub : t.signUpSub}</p>
             </div>
 
             {status === 'offline' && (
@@ -88,25 +96,34 @@ export default function SignInPage() {
               <Field icon={Mail} label={t.email}>
                 <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailPlaceholder} className={inputClass} dir="ltr" data-testid="input-email" />
               </Field>
+              {mode !== 'forgot' && (
               <Field icon={LockKeyhole} label={t.password}>
                 <input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'register' ? 8 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={mode === 'login' ? t.passwordPlaceholder : t.passwordNew} className={inputClass} dir="ltr" data-testid="input-password" />
               </Field>
+              )}
               {mode === 'login' && (
                 <div className="flex items-center justify-between gap-4">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-primary" data-testid="checkbox-remember" />
                     {t.remember}
                   </label>
+                  <button type="button" onClick={() => { setMode('forgot'); setError(null); setForgotDone(null); }} className="text-xs font-semibold text-primary hover:underline" data-testid="button-forgot-password">{t.forgotPassword}</button>
                 </div>
               )}
               {error && <p className="text-xs font-semibold text-destructive" role="alert" data-testid="auth-error">{error}</p>}
+              {mode === 'forgot' && forgotDone && (
+                <div className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs leading-5" role="status" data-testid="forgot-sent">
+                  <p className="font-semibold">{t.forgotSent}</p>
+                  {!forgotDone.emailConfigured && <p className="mt-1 text-muted-foreground" data-testid="forgot-no-email">{t.forgotNoEmail}</p>}
+                </div>
+              )}
               <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground shadow-[0_10px_25px_hsl(var(--primary)/.15)] transition hover:-translate-y-0.5 disabled:opacity-60" data-testid="button-sign-in">
-                {mode === 'login' ? t.signInButton : t.signUpButton}
+                {mode === 'login' ? t.signInButton : mode === 'forgot' ? t.forgotSend : t.signUpButton}
                 <span dir="ltr"><Arrow size={16} /></span>
               </button>
             </form>
-            <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); }} className="mt-4 w-full text-center text-xs font-semibold text-primary hover:underline" data-testid="button-switch-mode">
-              {mode === 'login' ? t.noAccount : t.haveAccount}
+            <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); setForgotDone(null); }} className="mt-4 w-full text-center text-xs font-semibold text-primary hover:underline" data-testid="button-switch-mode">
+              {mode === 'login' ? t.noAccount : mode === 'forgot' ? t.backToSignIn : t.haveAccount}
             </button>
             <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[.18em] text-muted-foreground/60"><span className="h-px flex-1 bg-border" />{t.or}<span className="h-px flex-1 bg-border" /></div>
             <button type="button" disabled={busy} onClick={() => void run(demo)} className="flex w-full items-center justify-center rounded-xl border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:bg-muted disabled:opacity-60" data-testid="button-enter-demo">{t.demo}</button>
