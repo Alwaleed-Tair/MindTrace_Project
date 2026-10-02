@@ -60,6 +60,11 @@ export const api = {
   demo: () => post<{ user: Person }>('/auth/demo'),
   logout: () => post<{ ok: boolean }>('/auth/logout'),
   createApiToken: (label: string) => post<{ token: string; label: string }>('/auth/api-token', { label }),
+  updateProfile: (fields: { name?: string; lab?: string }) => patch<{ user: Person }>('/auth/me', fields),
+  changePassword: (current_password: string, new_password: string) => post<{ ok: boolean }>('/auth/password', { current_password, new_password }),
+  forgotPassword: (email: string) => post<{ ok: boolean; email_configured: boolean }>('/auth/forgot', { email }),
+  resetPassword: (token: string, new_password: string) => post<{ user: Person }>('/auth/reset', { token, new_password }),
+  deleteAccount: (password: string) => request<{ ok: boolean }>('DELETE', '/auth/me', { password }),
 
   stats: () => get<Stats>('/stats'),
   listExperiments: (p: { status?: string; q?: string; sort?: string } = {}) => {
@@ -72,11 +77,14 @@ export const api = {
   getExperiment: (id: string) => get<Experiment>(`/experiments/${encodeURIComponent(id)}`),
   createExperiment: (title: string, summary: string) => post<Experiment>('/experiments', { title, summary }),
   setStatus: (id: string, status: Status) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, { status }),
+  updateExperiment: (id: string, fields: { title?: string; summary?: string }) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, fields),
 
   addNote: (id: string, text: string, kind: NoteKind = 'observation') => post<Note>(`/experiments/${encodeURIComponent(id)}/notes`, { text, kind }),
   updateNote: (noteId: number, text: string) => patch<Note>(`/notes/${noteId}`, { text }),
+  deleteNote: (noteId: number) => del(`/notes/${noteId}`),
 
   searchUsers: (q: string) => get<{ items: Person[] }>(`/users/search?q=${encodeURIComponent(q)}`).then((r) => r.items),
+  removeCollaborator: (id: string, personId: string) => del(`/experiments/${encodeURIComponent(id)}/collaborators/${encodeURIComponent(personId)}`),
   recentCollaborators: () => get<{ items: Person[] }>('/collaborators/recent').then((r) => r.items),
   addCollaborator: (id: string, identifier: string) =>
     post<{ collaborator: Person; experiment: Experiment }>(`/experiments/${encodeURIComponent(id)}/collaborators`, { identifier }),
