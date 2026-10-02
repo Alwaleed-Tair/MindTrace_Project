@@ -18,6 +18,7 @@ function signedIn(experiments = [exp()]) {
   A.recentCollaborators.mockResolvedValue([lina, omar]);
   A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, demo_enabled: true, dev_tools: false });
   A.insights.mockResolvedValue({ status: 'none', result: null, error: null, updated_at: null, ai_configured: false });
+  A.listTeams.mockResolvedValue([]);
 }
 
 beforeEach(() => {
@@ -781,5 +782,126 @@ describe('library pages', () => {
     expect(A.listNotes).toHaveBeenCalledWith({ source: 'recording', q: '', review: false });
     await userEvent.click(screen.getByTestId('filter-recordings-review'));
     await waitFor(() => expect(A.listNotes).toHaveBeenLastCalledWith({ source: 'recording', q: '', review: true }));
+  });
+});
+
+describe('teams', () => {
+  const team = { id: '7', name: 'Materials lab', role: 'owner' as const, member_count: 2, experiment_count: 1, created_at: new Date().toISOString() };
+  const detail = (over: Record<string, unknown> = {}) => ({
+    ...team,
+    members: [
+      { ...noor, role: 'owner', joined_at: new Date().toISOString(), experiment_count: 1, notes_14d: 4 },
+      { ...omar, role: 'supervisor', joined_at: new Date().toISOString(), experiment_count: 0, notes_14d: 2 },
+    ],
+    experiments: [exp({ id: '1', team: { id: '7', name: 'Materials lab' } })],
+    invite_token: 'tok_abc123',
+    ...over,
+  });
+
+  it('with no team yet: create one and land on its page', async () => {
+    signedIn();
+    A.createTeam.mockResolvedValue(detail());
+    A.getTeam.mockResolvedValue(detail());
+    renderApp('/team');
+    expect(await screen.findByTestId('card-create-team')).toBeInTheDocument();
+    expect(screen.queryByTestId('teams-list')).toBeNull();
+    fireEvent.change(screen.getByTestId('input-team-name'), { target: { value: '  Materials lab ' } });
+    await userEvent.click(screen.getByTestId('button-create-team'));
+    await waitFor(() => expect(A.createTeam).toHaveBeenCalledWith('Materials lab'));
+    expect(await screen.findByTestId('team-page')).toBeInTheDocument();
+    expect(screen.getByTestId('team-name')).toHaveTextContent('Materials lab');
+  });
+
+  it('the sidebar and the dashboard lead to your team', async () => {
+    signedIn();
+    A.listTeams.mockResolvedValue([team]);
+    renderApp();
+    const card = await screen.findByTestId('dashboard-team-7');
+    expect(card).toHaveTextContent('Materials lab');
+    expect(card).toHaveTextContent('2 members');
+    expect(screen.getByTestId('link-nav-team')).toBeInTheDocument();
+  });
+
+  it('the owner sees roles, the invite link, and can add a supervisor', async () => {
+    signedIn();
+    A.getTeam.mockResolvedValue(detail());
+    A.addTeamMember.mockResolvedValue(detail());
+    renderApp('/team/7');
+    await screen.findByTestId('team-page');
+    expect(screen.getByTestId(`member-role-${noor.id}`)).toHaveAttribute('data-role', 'owner');
+    expect(screen.getByTestId(`member-role-${omar.id}`)).toHaveTextContent('Supervisor');
+    expect(screen.getByTestId('invite-url')).toHaveTextContent('/join/tok_abc123');
+    expect(screen.getByTestId('team-exp-1')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('input-member'), { target: { value: 'lina@lab.com' } });
+    fireEvent.change(screen.getByTestId('select-new-member-role'), { target: { value: 'supervisor' } });
+    await userEvent.click(screen.getByTestId('button-add-member'));
+    await waitFor(() => expect(A.addTeamMember).toHaveBeenCalledWith('7', 'lina@lab.com', 'supervisor'));
+    expect(screen.getByTestId('button-delete-team')).toBeInTheDocument();
+  });
+
+  it('a member sees no invite link, no add form, and can leave', async () => {
+    A.me.mockResolvedValue({ user: omar });
+    signedIn();
+    A.me.mockResolvedValue({ user: omar });
+    const d = detail({ role: 'member', invite_token: undefined, members: [
+      { ...noor, role: 'owner', joined_at: new Date().toISOString(), experiment_count: 1, notes_14d: 4 },
+      { ...omar, role: 'member', joined_at: new Date().toISOString(), experiment_count: 0, notes_14d: 2 },
+    ] });
+    A.getTeam.mockResolvedValue(d);
+    A.removeTeamMember.mockResolvedValue(undefined);
+    renderApp('/team/7');
+    await screen.findByTestId('team-page');
+    expect(screen.queryByTestId('card-invite')).toBeNull();
+    expect(screen.queryByTestId('card-add-member')).toBeNull();
+    expect(screen.queryByTestId(`button-remove-${noor.id}`)).toBeNull();
+    await userEvent.click(screen.getByTestId('button-leave-team'));
+    await userEvent.click(screen.getByTestId('button-confirm-team'));
+    await waitFor(() => expect(A.removeTeamMember).toHaveBeenCalledWith('7', omar.id));
+  });
+
+  it('an invite link shows the team and joins it', async () => {
+    signedIn();
+    A.previewInvite.mockResolvedValue({ team: { id: '7', name: 'Materials lab', member_count: 2 }, owner: noor, already_member: false });
+    A.acceptInvite.mockResolvedValue(detail({ role: 'member' }));
+    A.getTeam.mockResolvedValue(detail({ role: 'member', invite_token: undefined }));
+    renderApp('/join/tok_abc123');
+    expect(await screen.findByTestId('invite-team-name')).toHaveTextContent('Materials lab');
+    await userEvent.click(screen.getByTestId('button-accept-invite'));
+    await waitFor(() => expect(A.acceptInvite).toHaveBeenCalledWith('tok_abc123'));
+    expect(await screen.findByTestId('team-page')).toBeInTheDocument();
+  });
+
+  it('an invite link opened while signed out is kept for after sign-in', async () => {
+    A.me.mockRejectedValue(new ApiError(401, 'not signed in'));
+    renderApp('/join/tok_later');
+    await screen.findByTestId('button-sign-in');
+    expect(window.sessionStorage.getItem('mindtrace.pendingInvite')).toBe('tok_later');
+    window.sessionStorage.clear();
+  });
+
+  it('a pasted invite link goes to the join page', async () => {
+    signedIn();
+    A.previewInvite.mockRejectedValue(new ApiError(404, 'not valid'));
+    renderApp('/team');
+    fireEvent.change(await screen.findByTestId('input-invite'), { target: { value: 'https://mindtrace.app/join/zzz_999' } });
+    await userEvent.click(screen.getByTestId('button-join-team'));
+    expect(await screen.findByTestId('invite-invalid')).toBeInTheDocument();
+    expect(A.previewInvite).toHaveBeenCalledWith('zzz_999');
+  });
+
+  it('a new experiment can be shared with a team, and the owner can change it later', async () => {
+    signedIn();
+    A.listTeams.mockResolvedValue([team]);
+    A.createExperiment.mockResolvedValue(exp({ id: '9' }));
+    A.getExperiment.mockResolvedValue(exp({ id: '9' }));
+    A.shareWithTeam.mockResolvedValue(exp({ id: '9', team: { id: '7', name: 'Materials lab' } }));
+    renderApp();
+    await userEvent.click(await screen.findByTestId('button-new-experiment'));
+    fireEvent.change(screen.getByTestId('input-experiment-title'), { target: { value: 'Team study' } });
+    fireEvent.change(await screen.findByTestId('select-create-team'), { target: { value: '7' } });
+    await userEvent.click(screen.getByTestId('button-submit-create'));
+    await waitFor(() => expect(A.createExperiment).toHaveBeenCalledWith('Team study', '', '7'));
+    fireEvent.change(await screen.findByTestId('select-experiment-team'), { target: { value: '' } });
+    await waitFor(() => expect(A.shareWithTeam).toHaveBeenCalledWith('9', null));
   });
 });
