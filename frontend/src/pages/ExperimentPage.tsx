@@ -9,6 +9,7 @@ import { StatusActions } from '@/components/dashboard/StatusActions';
 import { AddNoteCard, NOTE_TEXTAREA_ID } from '@/components/experiment/AddNoteCard';
 import { EditDetails } from '@/components/experiment/EditDetails';
 import { ExportMenu } from '@/components/experiment/ExportMenu';
+import { ShareWithTeam } from '@/components/common/ShareWithTeam';
 import { InsightsTab, OriginalityCard, useAutoTranslate } from '@/components/experiment/InsightsPanels';
 import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
@@ -135,6 +136,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
               <UserPlus size={13} />
               {t.addPeople}
             </button>
+            <ShareWithTeam experiment={experiment} />
             <ExportMenu experiment={experiment} />
             {experiment.role === 'owner' && (
               <button type="button" onClick={() => setDeleteOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:border-destructive/50 hover:text-destructive" data-testid="button-delete-experiment">

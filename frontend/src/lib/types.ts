@@ -58,6 +58,8 @@ export interface Experiment {
   /** When each note happened and its kind (the last 40), for the trace drawn on cards. */
   trace?: TraceMark[];
   kind_counts?: Record<NoteKind, number>;
+  /** The team it is shared with (everyone in it can see it and add notes), if any. */
+  team?: { id: string; name: string } | null;
 }
 
 /** A note listed outside its experiment (Hypotheses and Recordings pages), with the experiment it belongs to. */
@@ -132,7 +134,7 @@ export interface Insights {
   needs_translation?: boolean;
 }
 
-export type NotificationKind = 'note_added' | 'note_updated' | 'collaborator_added' | 'status_changed';
+export type NotificationKind = 'note_added' | 'note_updated' | 'collaborator_added' | 'status_changed' | 'team_added' | 'team_joined';
 
 export interface NotificationItem {
   id: number | string;
@@ -152,4 +154,35 @@ export interface Health {
   ai_configured: boolean;
   demo_enabled: boolean;
   dev_tools: boolean;
+}
+
+export type TeamRole = 'owner' | 'supervisor' | 'member';
+
+export interface Team {
+  id: string;
+  name: string;
+  role: TeamRole;
+  member_count: number;
+  experiment_count: number;
+  created_at: string;
+}
+
+export interface TeamMember extends Person {
+  role: TeamRole;
+  joined_at: string;
+  experiment_count: number;
+  notes_14d: number;
+}
+
+export interface TeamDetail extends Team {
+  members: TeamMember[];
+  experiments: Experiment[];
+  /** Only for the owner and supervisors. */
+  invite_token?: string;
+}
+
+export interface InvitePreview {
+  team: { id: string; name: string; member_count: number };
+  owner: Person;
+  already_member: boolean;
 }

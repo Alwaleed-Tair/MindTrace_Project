@@ -39,10 +39,11 @@ export function useInsights(id: string) {
 export function useCreateExperiment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ title, summary }: { title: string; summary: string }) => api.createExperiment(title, summary),
+    mutationFn: ({ title, summary, teamId }: { title: string; summary: string; teamId?: string | null }) => api.createExperiment(title, summary, teamId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['experiments'] });
       void qc.invalidateQueries({ queryKey: ['stats'] });
+      void qc.invalidateQueries({ queryKey: ['teams'] });
     },
   });
 }
@@ -162,4 +163,43 @@ export function useDeleteNote(id: string) {
 export function useRemoveCollaborator(id: string) {
   const changed = useExperimentChanged(id);
   return useMutation({ mutationFn: (personId: string) => api.removeCollaborator(id, personId), onSuccess: changed });
+}
+
+// ------------------------------------------------------------------ teams
+export function useTeams(enabled = true) {
+  return useQuery({ queryKey: ['teams'], queryFn: api.listTeams, retry, enabled });
+}
+
+export function useTeam(id: string) {
+  return useQuery({ queryKey: ['team', id], queryFn: () => api.getTeam(id), retry });
+}
+
+/** Any change to a team: the team page, the list of teams and the experiments it can see are refreshed. */
+function useTeamMutation<V>(fn: (v: V) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['teams'] });
+      void qc.invalidateQueries({ queryKey: ['team'] });
+      void qc.invalidateQueries({ queryKey: ['experiments'] });
+      void qc.invalidateQueries({ queryKey: ['experiment'] });
+      void qc.invalidateQueries({ queryKey: ['stats'] });
+      void qc.invalidateQueries({ queryKey: ['notes'] });
+    },
+  });
+}
+
+export const useCreateTeam = () => useTeamMutation((name: string) => api.createTeam(name));
+export const useRenameTeam = (id: string) => useTeamMutation((name: string) => api.renameTeam(id, name));
+export const useDeleteTeam = (id: string) => useTeamMutation(() => api.deleteTeam(id));
+export const useAddTeamMember = (id: string) => useTeamMutation((v: { identifier: string; role: 'member' | 'supervisor' }) => api.addTeamMember(id, v.identifier, v.role));
+export const useSetTeamRole = (id: string) => useTeamMutation((v: { personId: string; role: 'member' | 'supervisor' }) => api.setTeamRole(id, v.personId, v.role));
+export const useRemoveTeamMember = (id: string) => useTeamMutation((personId: string) => api.removeTeamMember(id, personId));
+export const useResetInvite = (id: string) => useTeamMutation(() => api.resetInvite(id));
+export const useAcceptInvite = () => useTeamMutation((token: string) => api.acceptInvite(token));
+export const useShareWithTeam = (experimentId: string) => useTeamMutation((teamId: string | null) => api.shareWithTeam(experimentId, teamId));
+
+export function useInvite(token: string) {
+  return useQuery({ queryKey: ['invite', token], queryFn: () => api.previewInvite(token), retry: false });
 }

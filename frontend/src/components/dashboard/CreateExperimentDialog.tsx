@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { usePreferences } from '@/context/PreferencesContext';
+import { useTeams } from '@/hooks/queries';
 
-export function CreateExperimentDialog({ open, onOpenChange, onCreate, busy, error }: { open: boolean; onOpenChange: (v: boolean) => void; onCreate: (title: string, summary: string) => void; busy: boolean; error: string | null }) {
+export function CreateExperimentDialog({ open, onOpenChange, onCreate, busy, error }: { open: boolean; onOpenChange: (v: boolean) => void; onCreate: (title: string, summary: string, teamId: string | null) => void; busy: boolean; error: string | null }) {
   const { t, dir } = usePreferences();
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const teams = useTeams(open).data ?? [];
   const submit = () => {
-    if (title.trim() && !busy) onCreate(title.trim(), summary.trim());
+    if (title.trim() && !busy) onCreate(title.trim(), summary.trim(), teamId || null);
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -32,6 +35,15 @@ export function CreateExperimentDialog({ open, onOpenChange, onCreate, busy, err
             <span className="mb-2 block text-xs font-semibold">{t.summary}</span>
             <textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={t.summaryPlaceholder} rows={3} className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition placeholder:text-muted-foreground/55 focus:border-primary" data-testid="input-experiment-summary" />
           </label>
+          {teams.length > 0 && (
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold">{t.shareWith}</span>
+              <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-primary" data-testid="select-create-team">
+                <option value="">{t.onlyMe}</option>
+                {teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+              </select>
+            </label>
+          )}
           {error && <p className="text-xs font-semibold text-destructive" role="alert" data-testid="create-error">{error}</p>}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" onClick={() => onOpenChange(false)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted" data-testid="button-cancel-create">{t.cancel}</button>

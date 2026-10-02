@@ -1,7 +1,7 @@
 """Seed demo data (idempotent):  python seed.py
 
 Creates the demo workspace the "Open demo workspace" button opens: four demo users, the four experiments from the
-original frontend mock (seed_data/experiments.json), shared with some of the other users, and every recorder
+original frontend mock (seed_data/experiments.json), shared with some of the other users, a demo team, and every recorder
 session JSON in ../bridge/samples ingested as a real experiment.
 
 All demo users share one password (env MINDTRACE_DEMO_PASSWORD, default below) - for local demos only. Refused when
@@ -22,6 +22,7 @@ from core.db import Database
 from schemas.session import SessionIn
 from services import experiments as ex
 from services import sessions as sessions_service
+from services import teams as teams_service
 from services import users as users_service
 
 HERE = Path(__file__).resolve().parent
@@ -61,6 +62,16 @@ def seed(db: Database, say=print, samples_dir: Path | None = None) -> dict:
         db.run("UPDATE experiments SET updated_at=? WHERE id=?", (users_service.iso(updated), eid))
         created += 1
         say(f"experiment {e['code']} ({len(e['notes'])} notes)")
+    # a demo team: the demo user owns it, Lina supervises, Omar and Sara are members; one experiment is shared with it
+    if not db.one("SELECT 1 FROM teams WHERE owner_id=?", (owner["id"],)):
+        t = teams_service.create_team(db, owner["id"], "Materials lab")
+        tid = int(t["id"])
+        for email, role in (("lina@mindtrace.app", "supervisor"), ("omar@mindtrace.app", "member"), ("sara@mindtrace.app", "member")):
+            if email in by_email:
+                db.run("INSERT OR IGNORE INTO team_members (team_id, user_id, role, joined_at) VALUES (?,?,?,?)",
+                       (tid, by_email[email]["id"], role, users_service.iso(users_service.now() - timedelta(days=9))))
+        db.run("UPDATE experiments SET team_id=? WHERE owner_id=? AND code='EXP-204'", (tid, owner["id"]))
+        say("team Materials lab (4 members)")
     imported = 0
     for f in sorted((samples_dir or HERE.parent / "bridge" / "samples").glob("*.json")):
         raw = json.loads(f.read_text(encoding="utf-8"))

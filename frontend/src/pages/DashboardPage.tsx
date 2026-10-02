@@ -1,4 +1,4 @@
-import { ArrowDownAZ, ChevronDown, FileCheck2, FlaskConical, NotebookPen, Plus, Search, SlidersHorizontal, TriangleAlert } from 'lucide-react';
+import { ArrowDownAZ, ChevronDown, ChevronRight, FileCheck2, FlaskConical, NotebookPen, Plus, Search, SlidersHorizontal, TriangleAlert, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { CreateExperimentDialog } from '@/components/dashboard/CreateExperimentDialog';
@@ -6,7 +6,9 @@ import { ExperimentCard } from '@/components/dashboard/ExperimentCard';
 import { MetricCard } from '@/components/dashboard/MetricCards';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useCreateExperiment, useExperiments, useSetStatus, useStats } from '@/hooks/queries';
+import { useCreateExperiment, useExperiments, useSetStatus, useStats, useTeams } from '@/hooks/queries';
+import { RoleBadge } from '@/components/common/RoleBadge';
+import { Link } from 'wouter';
 import { ApiError } from '@/lib/api';
 import { fill, greetingKey, greetingName, longDate } from '@/lib/format';
 import type { Status } from '@/lib/types';
@@ -23,6 +25,7 @@ export default function DashboardPage() {
 
   const experiments = useExperiments({ status: filter, q: query.trim(), sort: newestFirst ? 'newest' : 'oldest' });
   const stats = useStats();
+  const teams = useTeams().data ?? [];
   const setStatus = useSetStatus();
   const create = useCreateExperiment();
 
@@ -52,6 +55,24 @@ export default function DashboardPage() {
         <MetricCard testId="metric-quality" icon={FileCheck2} label={t.docQualityAvg} value={quality === null || quality === undefined ? '—' : `${quality}%`} note={fill(t.analyzedOf, { n: sd?.insights.experiments_analyzed ?? 0 })} delay={3} />
         <MetricCard testId="metric-review" icon={TriangleAlert} tone={review ? 'warn' : 'default'} label={t.toReview} value={String(review)} note={t.toReviewSub} delay={4} />
       </div>
+
+      {teams.length > 0 && (
+        <section className="mt-6 animate-in delay-2" aria-label={t.teamOnDashboard} data-testid="dashboard-teams">
+          <div className="flex flex-wrap gap-3">
+            {teams.map((tm) => (
+              <Link key={tm.id} href={`/team/${tm.id}`} className="surface group flex min-w-[260px] flex-1 items-center gap-4 px-5 py-4 transition hover:border-primary/40" data-testid={`dashboard-team-${tm.id}`}>
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Users size={18} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 text-[11px] text-muted-foreground">{t.teamOnDashboard}<RoleBadge role={tm.role} /></span>
+                  <span className="mt-0.5 block truncate text-sm font-semibold"><bdi>{tm.name}</bdi></span>
+                  <span className="text-[11px] text-muted-foreground">{fill(t.membersCount, { n: tm.member_count })} · {fill(t.sharedExperimentsCount, { n: tm.experiment_count })}</span>
+                </span>
+                <ChevronRight size={16} className="text-muted-foreground transition group-hover:text-primary rtl:rotate-180" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-10 animate-in delay-3">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -115,9 +136,9 @@ export default function DashboardPage() {
         onOpenChange={setShowCreate}
         busy={create.isPending}
         error={createError}
-        onCreate={(title, summary) =>
+        onCreate={(title, summary, teamId) =>
           create.mutate(
-            { title, summary },
+            { title, summary, teamId },
             {
               onSuccess: (e) => {
                 setShowCreate(false);
