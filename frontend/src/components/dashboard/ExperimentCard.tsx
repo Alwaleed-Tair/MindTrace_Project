@@ -1,4 +1,4 @@
-import { Clock3, Trash2, UserPlus } from 'lucide-react';
+import { Clock3, Trash2, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { Avatar } from '@/components/common/Avatar';
@@ -39,7 +39,8 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={e.status} />
             <span className="font-mono text-[10px] text-muted-foreground">{e.code}</span>
-            {e.role === 'editor' && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{fill(t.sharedBy, { name: e.owner.name })}</span>}
+            {e.team && <span className="inline-flex items-center gap-1 rounded-full bg-kind-hyp-soft px-2 py-0.5 text-[10px] font-semibold text-kind-hyp" data-testid={`team-chip-${e.id}`}><Users size={10} />{e.team.name}</span>}
+            {e.role === 'editor' && !e.team && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{fill(t.sharedBy, { name: e.owner.name })}</span>}
           </div>
           <h3 className="mt-3 line-clamp-1 text-[17px] font-semibold tracking-[-.03em]">{e.title}</h3>
           <p className="mt-2 line-clamp-2 min-h-[40px] text-xs leading-5 text-muted-foreground">{e.summary}</p>
