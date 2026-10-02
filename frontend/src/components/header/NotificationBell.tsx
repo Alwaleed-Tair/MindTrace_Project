@@ -44,6 +44,7 @@ export function NotificationBell() {
                   void markRead([n.id]);
                   setOpen(false);
                   if (n.experiment?.id) navigate(`/experiments/${n.experiment.id}`);
+                  else if (n.kind === 'team_added' || n.kind === 'team_joined') navigate('/team');
                 }}
                 className={`flex w-full items-start gap-3 px-5 py-3.5 text-start transition hover:bg-muted ${n.read ? '' : 'bg-primary/5'}`}
                 data-testid={`notification-${n.id}`}
