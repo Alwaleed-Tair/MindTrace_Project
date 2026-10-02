@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -27,6 +27,15 @@
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-muted: hsl(var(--sidebar-muted));
+  --color-sidebar-active: hsl(var(--sidebar-active));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-kind-obs: hsl(var(--kind-obs));
+  --color-kind-obs-soft: hsl(var(--kind-obs-soft));
+  --color-kind-hyp: hsl(var(--kind-hyp));
+  --color-kind-hyp-soft: hsl(var(--kind-hyp-soft));
+  --color-kind-dec: hsl(var(--kind-dec));
+  --color-kind-dec-soft: hsl(var(--kind-dec-soft));
   --color-sidebar-primary: hsl(var(--primary));
   --color-sidebar-primary-foreground: hsl(var(--primary-foreground));
   --font-sans: var(--app-font-sans);
@@ -38,52 +47,71 @@
 }
 
 :root {
-  --background: 210 25% 97.5%;
-  --foreground: 215 28% 14%;
-  --border: 214 20% 90%;
-  --input: 214 18% 84%;
-  --ring: 174 62% 38%;
+  /* MindTrace "trace" palette: cool paper ground, deep ink, one teal accent; note kinds have their own colors */
+  --background: 150 9% 95.5%;
+  --foreground: 174 24% 10%;
+  --border: 150 10% 89%;
+  --input: 150 9% 83%;
+  --ring: 174 79% 32%;
   --card: 0 0% 100%;
-  --card-foreground: 215 28% 14%;
-  --primary: 174 63% 33%;
+  --card-foreground: 174 24% 10%;
+  --primary: 174 79% 27%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 25% 94%;
-  --secondary-foreground: 215 28% 20%;
-  --muted: 210 22% 95%;
-  --muted-foreground: 215 14% 42%;
-  --accent: 170 55% 88%;
-  --accent-foreground: 175 50% 20%;
-  --destructive: 4 70% 50%;
+  --secondary: 150 10% 92%;
+  --secondary-foreground: 174 24% 14%;
+  --muted: 150 10% 94%;
+  --muted-foreground: 198 10% 36%;
+  --accent: 168 37% 92%;
+  --accent-foreground: 174 75% 22%;
+  --destructive: 4 64% 46%;
   --destructive-foreground: 0 0% 100%;
-  --sidebar: 0 0% 100%;
-  --sidebar-foreground: 215 22% 28%;
-  --sidebar-border: 214 20% 91%;
-  --app-font-sans: 'DM Sans', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
-  --app-font-mono: 'DM Sans', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+  --sidebar: 171 33% 9%;
+  --sidebar-foreground: 167 20% 88%;
+  --sidebar-border: 171 25% 16%;
+  --sidebar-muted: 168 13% 61%;
+  --sidebar-active: 170 29% 16%;
+  --sidebar-accent: 171 58% 60%;
+  --kind-obs: 174 79% 27%;
+  --kind-obs-soft: 168 37% 92%;
+  --kind-hyp: 246 50% 52%;
+  --kind-hyp-soft: 248 67% 95%;
+  --kind-dec: 35 89% 33%;
+  --kind-dec-soft: 38 76% 93%;
+  --app-font-sans: 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
   --radius: 0.9rem;
 }
 
 .dark {
-  --background: 218 24% 8.5%;
-  --foreground: 210 20% 93%;
-  --border: 217 18% 19%;
-  --input: 217 18% 25%;
-  --ring: 170 60% 52%;
-  --card: 218 22% 11.5%;
-  --card-foreground: 210 20% 93%;
-  --primary: 170 60% 50%;
-  --primary-foreground: 218 40% 8%;
-  --secondary: 217 18% 17%;
-  --secondary-foreground: 210 20% 88%;
-  --muted: 217 18% 15%;
-  --muted-foreground: 215 12% 62%;
-  --accent: 172 35% 22%;
-  --accent-foreground: 170 50% 85%;
-  --destructive: 4 62% 50%;
+  --background: 172 30% 7%;
+  --foreground: 165 15% 92%;
+  --border: 172 20% 17%;
+  --input: 172 18% 23%;
+  --ring: 171 58% 60%;
+  --card: 172 26% 10%;
+  --card-foreground: 165 15% 92%;
+  --primary: 171 58% 60%;
+  --primary-foreground: 172 50% 8%;
+  --secondary: 172 20% 14%;
+  --secondary-foreground: 165 15% 88%;
+  --muted: 172 20% 13%;
+  --muted-foreground: 168 12% 66%;
+  --accent: 172 35% 18%;
+  --accent-foreground: 171 58% 82%;
+  --destructive: 4 70% 58%;
   --destructive-foreground: 0 0% 100%;
-  --sidebar: 218 24% 10%;
-  --sidebar-foreground: 210 18% 85%;
-  --sidebar-border: 217 18% 17%;
+  --sidebar: 172 35% 5%;
+  --sidebar-foreground: 167 20% 88%;
+  --sidebar-border: 172 25% 12%;
+  --sidebar-muted: 168 13% 61%;
+  --sidebar-active: 172 28% 13%;
+  --sidebar-accent: 171 58% 60%;
+  --kind-obs: 171 58% 60%;
+  --kind-obs-soft: 172 35% 16%;
+  --kind-hyp: 248 100% 80%;
+  --kind-hyp-soft: 248 30% 20%;
+  --kind-dec: 36 84% 65%;
+  --kind-dec-soft: 36 40% 16%;
 }
 
 @layer base {
@@ -178,3 +206,29 @@
 @media (max-width: 767px) {
   .mobile-hide { display: none; }
 }
+/* the sidebar is ink in both themes: its own text, hover and logo colors */
+.sidebar-ink .mindtrace-wordmark { color: #fff; }
+.sidebar-ink .mindtrace-wordmark span { color: hsl(var(--sidebar-accent)); }
+
+/* The dark header band on an experiment: everything inside it (buttons, inputs, pills) reads the ink palette. */
+.ink-band {
+  --background: 171 30% 12%;
+  --foreground: 0 0% 100%;
+  --card: 171 30% 12%;
+  --card-foreground: 0 0% 100%;
+  --muted: 170 29% 16%;
+  --muted-foreground: 168 14% 68%;
+  --border: 171 25% 21%;
+  --input: 171 25% 24%;
+  --primary: 171 58% 60%;
+  --primary-foreground: 172 50% 8%;
+  --accent: 170 29% 16%;
+  --accent-foreground: 171 58% 60%;
+  --kind-dec-soft: 36 40% 18%;
+  --kind-dec: 36 84% 65%;
+  --kind-hyp: 248 100% 80%;
+  --kind-obs: 171 58% 60%;
+  background: hsl(var(--sidebar));
+  color: hsl(var(--foreground));
+}
+.dark .ink-band { background: hsl(172 32% 10%); }
