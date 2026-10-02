@@ -119,6 +119,11 @@ def serialize(db: Database, e, user_id: int, with_notes: bool = False) -> dict:
          "role": "owner" if e["owner_id"] == user_id else "editor",
          "owner": public(owner, include_email=False), "collaborators": _people(db, e["id"]), "note_count": note_count,
          "session_id": e["session_id"], "ai_status": e["ai_status"]}
+    # the "trace" the cards draw: when each note happened and its kind (last 40), plus how many of each kind
+    marks = db.all("""SELECT created_at, kind, time_label FROM notes WHERE experiment_id=? ORDER BY created_at DESC, id DESC LIMIT 40""", (e["id"],))
+    d["trace"] = [{"at": m["created_at"], "kind": m["kind"], "time_label": m["time_label"]} for m in reversed(marks)]
+    counts = {r["kind"]: r["n"] for r in db.all("SELECT kind, COUNT(*) AS n FROM notes WHERE experiment_id=? GROUP BY kind", (e["id"],))}
+    d["kind_counts"] = {k: counts.get(k, 0) for k in NOTE_KINDS}
     if with_notes:
         rows = db.all("SELECT * FROM notes WHERE experiment_id=? ORDER BY created_at, id", (e["id"],))
         files = audio_files_of(db, e["id"])

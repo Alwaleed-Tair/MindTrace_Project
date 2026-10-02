@@ -151,19 +151,75 @@ describe('header', () => {
 });
 
 describe('dashboard metrics', () => {
-  it('has no Log Note button, no subtext under Avg. originality, and no Insights card', async () => {
+  it('shows real figures only: active, notes this week, documentation quality and notes to review; no Log Note button and no Insights card', async () => {
     signedIn();
     renderApp();
     await screen.findByTestId('experiments-grid');
     expect(screen.queryByText(/log note/i)).toBeNull();
-    const orig = screen.getByTestId('metric-originality');
-    expect(orig).toHaveTextContent('Avg. originality');
-    expect(orig).toHaveTextContent('78%');
-    expect(orig.textContent).not.toMatch(/across all work/i);
-    expect(orig.textContent).toBe('Avg. originality78%'); // only the label and the number: no note under it
-    expect(screen.queryByTestId('metric-notes')).toBeNull(); // the weekly notes card was removed
-    expect(screen.queryByTestId('link-nav-experiments')).toBeNull(); // so was the sidebar Experiments button
-    expect(screen.queryByTestId('card-insights-summary')).toBeNull(); // no Insights on the home page
+    expect(screen.getByTestId('metric-active')).toHaveTextContent('1of 1');
+    expect(screen.getByTestId('metric-notes')).toHaveTextContent('Notes this week31 last week');
+    expect(screen.getByTestId('metric-quality')).toHaveTextContent('—'); // nothing analysed yet: no made-up number
+    expect(screen.getByTestId('metric-review')).toHaveTextContent('0');
+    // the old average originality averaged the default 50 of unanalysed experiments, so it is gone
+    expect(screen.queryByTestId('metric-originality')).toBeNull();
+    expect(screen.queryByTestId('link-nav-experiments')).toBeNull();
+    expect(screen.queryByTestId('card-insights-summary')).toBeNull();
+  });
+
+  it('shows the documentation quality once experiments are analysed', async () => {
+    signedIn();
+    A.stats.mockResolvedValue({ ...emptyStats, insights: { ...emptyStats.insights, experiments_analyzed: 2, avg_documentation_quality: 74, notes_to_review: 3 } });
+    renderApp();
+    await waitFor(() => expect(screen.getByTestId('metric-quality')).toHaveTextContent('74%'));
+    expect(screen.getByTestId('metric-review')).toHaveTextContent('3');
+  });
+});
+
+describe('the trace', () => {
+  const at = (min: number) => new Date(Date.now() - (60 - min) * 60_000).toISOString();
+  it('cards draw one dot per note and count the kinds; originality shows only after an analysis', async () => {
+    signedIn([
+      exp({ id: '1', trace: [{ at: at(0), kind: 'observation', time_label: null }, { at: at(30), kind: 'hypothesis', time_label: null }], kind_counts: { observation: 1, hypothesis: 1, decision: 0 } }),
+      exp({ id: '2', title: 'Second', code: 'EXP-2', ai_status: 'done', originality: 71 }),
+    ]);
+    renderApp();
+    await screen.findByTestId('experiments-grid');
+    expect(screen.getByTestId('trace-1')).toHaveAttribute('data-points', '2');
+    expect(screen.getByTestId('kinds-1')).toHaveTextContent('1Observation');
+    expect(screen.getByTestId('kinds-1')).toHaveTextContent('1Hypothesis');
+    expect(screen.getByTestId('originality-1')).toHaveTextContent('Not analyzed');
+    expect(screen.getByTestId('originality-2')).toHaveTextContent('71');
+  });
+
+  it('the experiment page trace jumps to a note, and hypotheses are listed', async () => {
+    signedIn();
+    const n = (id: number, kind: 'observation' | 'hypothesis' | 'decision', min: number, text: string) => ({ id, text, kind, source: 'manual' as const, text_source: 'human' as const, time_label: null, created_at: at(min), updated_at: at(min), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true });
+    A.getExperiment.mockResolvedValue(exp({ notes: [n(1, 'observation', 0, 'colour turned amber'), n(2, 'hypothesis', 20, 'airflow cools the sample'), n(3, 'decision', 40, 'repeat at 26 degrees')] }));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderApp('/experiments/1');
+    await screen.findByTestId('session-trace');
+    expect(screen.getByTestId('trace-kinds')).toHaveTextContent('1 observations · 1 hypotheses · 1 decisions');
+    expect(screen.getByTestId('note-kind-2')).toHaveTextContent('Hypothesis');
+    expect(within(screen.getByTestId('card-hypotheses')).getByTestId('hypothesis-2')).toHaveTextContent('airflow cools the sample');
+    await userEvent.click(screen.getByTestId('trace-mark-3'));
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+    // the kind filter keeps only one kind in the timeline
+    await userEvent.click(screen.getByTestId('filter-kind-decision'));
+    expect(screen.queryByTestId('note-1')).toBeNull();
+    expect(screen.getByTestId('note-3')).toBeInTheDocument();
+  });
+
+  it('a note can be filed as a hypothesis', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp());
+    A.addNote.mockResolvedValue({});
+    renderApp('/experiments/1');
+    const box = await screen.findByTestId('textarea-new-note');
+    await userEvent.click(screen.getByTestId('note-kind-hypothesis'));
+    fireEvent.change(box, { target: { value: 'humidity matters' } });
+    await userEvent.click(screen.getByTestId('button-save-note'));
+    await waitFor(() => expect(A.addNote).toHaveBeenCalledWith('1', 'humidity matters', 'hypothesis'));
   });
 });
 
