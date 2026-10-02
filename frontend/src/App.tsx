@@ -10,6 +10,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import ExperimentPage from '@/pages/ExperimentPage';
 import NotFound from '@/pages/not-found';
 import ReportPage from '@/pages/ReportPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SignInPage from '@/pages/SignInPage';
 
@@ -34,6 +35,7 @@ function Routes() {
     <ErrorBoundary resetKey={location}>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/dashboard">
           <Private><DashboardPage /></Private>
         </Route>

@@ -1,7 +1,8 @@
-import { AudioLines, Eye } from 'lucide-react';
+import { AudioLines, Eye, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
+import { useDeleteNote } from '@/hooks/queries';
 import { clockTime, fill } from '@/lib/format';
 import type { Note } from '@/lib/types';
 
@@ -9,6 +10,26 @@ function NoteAudio({ experimentId, noteId }: { experimentId: string; noteId: num
   const [failed, setFailed] = useState(false);
   if (failed) return null; // no audio stored for this note: show nothing instead of a broken player
   return <audio controls preload="none" className="mt-3 h-8 w-full max-w-sm" src={`/api/experiments/${encodeURIComponent(experimentId)}/notes/${noteId}/audio`} onError={() => setFailed(true)} data-testid={`audio-${noteId}`} />;
+}
+
+/** Trash button, then a one-line "Delete this note?" confirm in place. Shown to the note's author and the experiment owner. */
+function DeleteNote({ experimentId, noteId }: { experimentId: string; noteId: number }) {
+  const { t } = usePreferences();
+  const [asking, setAsking] = useState(false);
+  const del = useDeleteNote(experimentId);
+  if (!asking)
+    return (
+      <button type="button" onClick={() => setAsking(true)} aria-label={t.deleteNote} title={t.deleteNote} className="rounded-md p-1 text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive" data-testid={`button-delete-note-${noteId}`}>
+        <Trash2 size={13} />
+      </button>
+    );
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-destructive/8 px-2 py-1 text-[11px]" data-testid={`confirm-delete-note-${noteId}`}>
+      <span className="font-semibold text-destructive">{del.isError ? t.actionFailed : t.deleteNoteAsk}</span>
+      <button type="button" disabled={del.isPending} onClick={() => del.mutate(noteId)} className="rounded-md bg-destructive px-2 py-0.5 font-semibold text-destructive-foreground disabled:opacity-50" data-testid={`button-confirm-delete-note-${noteId}`}>{t.yesDelete}</button>
+      <button type="button" disabled={del.isPending} onClick={() => { del.reset(); setAsking(false); }} className="rounded-md px-1.5 py-0.5 font-semibold text-muted-foreground hover:text-foreground">{t.cancel}</button>
+    </span>
+  );
 }
 
 export function NotesTimeline({ experimentId, notes, showAuthors, limit }: { experimentId: string; notes: Note[]; showAuthors: boolean; limit?: number }) {
@@ -37,6 +58,7 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit }: { exp
                   {note.source === 'recording' && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><AudioLines size={10} />{t.fromRecording}</span>}
                   {note.asr?.needs_review && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300" data-testid={`note-review-${note.id}`}><Eye size={10} />{t.needsReview}</span>}
                   {showAuthors && note.author && <span className="ms-auto inline-flex items-center gap-1.5 text-[10px] text-muted-foreground"><Avatar person={note.author} size={18} />{note.author.name}</span>}
+                  {note.can_edit && <span className={showAuthors && note.author ? '' : 'ms-auto'}><DeleteNote experimentId={experimentId} noteId={note.id} /></span>}
                 </div>
                 <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground/80" dir="auto">{note.text}</p>
                 {note.asr?.needs_review && note.asr.alternative && (

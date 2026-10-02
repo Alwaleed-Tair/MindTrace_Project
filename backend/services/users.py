@@ -122,3 +122,89 @@ def recent_collaborators(db: Database, user_id: int, limit: int = 8) -> list[dic
     rows = db.all("""SELECT u.*, MAX(c.rowid) AS last_added FROM collaborators c JOIN users u ON u.id=c.user_id
                      WHERE c.added_by=? AND u.id<>? GROUP BY u.id ORDER BY last_added DESC LIMIT ?""", (user_id, user_id, limit))
     return [public(r) for r in rows]
+
+
+# ------------------------------------------------------------- own account
+def _check_password(password: str) -> str:
+    if len(password) < 8 or len(password) > 200:
+        raise UserError("password must be 8 to 200 characters")
+    return password
+
+
+def update_profile(db: Database, user_id: int, patch: dict):
+    """Name and lab only; the e-mail address is the login and stays as it is."""
+    sets, args = [], []
+    if "name" in patch:
+        name = str(patch["name"] or "").strip()
+        if not name or len(name) > 80:
+            raise UserError("name is required (max 80 characters)")
+        sets.append("name=?"); args.append(name)
+    if "lab" in patch:
+        lab = str(patch["lab"] or "").strip()
+        if len(lab) > 80:
+            raise UserError("lab is at most 80 characters")
+        sets.append("lab=?"); args.append(lab)
+    if not sets:
+        raise UserError("nothing to update")
+    db.run(f"UPDATE users SET {', '.join(sets)} WHERE id=?", (*args, user_id))
+    return db.one("SELECT * FROM users WHERE id=?", (user_id,))
+
+
+def set_password(db: Database, user_id: int, new_password: str, keep_session_token: str | None = None) -> None:
+    """New password; every other login session ends (a stolen cookie stops working). Bridge tokens are kept."""
+    pw_hash = security.hash_password(_check_password(new_password))
+    keep = security.token_hash(keep_session_token) if keep_session_token else ""
+    with db.tx() as c:
+        c.execute("UPDATE users SET password_hash=? WHERE id=?", (pw_hash, user_id))
+        c.execute("DELETE FROM auth_sessions WHERE user_id=? AND token_hash<>?", (user_id, keep))
+        c.execute("DELETE FROM password_resets WHERE user_id=?", (user_id,))
+
+
+def change_password(db: Database, user, current_password: str, new_password: str, session_token: str | None) -> None:
+    if user["is_demo"]:
+        raise UserError("the shared demo account's password cannot be changed")
+    if not security.verify_password(current_password, user["password_hash"]):
+        raise UserError("the current password is not correct")
+    if current_password == new_password:
+        raise UserError("choose a password different from the current one")
+    set_password(db, user["id"], new_password, keep_session_token=session_token)
+
+
+def create_reset_token(db: Database, user_id: int, minutes: int) -> str:
+    """One live link per user: asking again replaces the previous one."""
+    token = security.new_token()
+    created = now()
+    with db.tx() as c:
+        c.execute("DELETE FROM password_resets WHERE user_id=?", (user_id,))
+        c.execute("INSERT INTO password_resets (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)",
+                  (security.token_hash(token), user_id, iso(created), iso(created + timedelta(minutes=minutes))))
+    return token
+
+
+def reset_password(db: Database, token: str, new_password: str):
+    """Uses the link once. Returns the user row; every login session of that user ends."""
+    _check_password(new_password)
+    h = security.token_hash(token.strip())
+    row = db.one("SELECT * FROM password_resets WHERE token_hash=?", (h,))
+    if row is None or row["used_at"] or row["expires_at"] <= iso():
+        raise UserError("this reset link is invalid or has expired: ask for a new one")
+    set_password(db, row["user_id"], new_password)
+    return db.one("SELECT * FROM users WHERE id=?", (row["user_id"],))
+
+
+def delete_account(db: Database, user, password: str, audio_root=None) -> None:
+    """Removes the user, the experiments they own (with notes and recordings) and their notes in other people's
+    experiments. Experiments they only collaborate on stay with their owners."""
+    if user["is_demo"]:
+        raise UserError("the shared demo account cannot be deleted")
+    if not security.verify_password(password, user["password_hash"]):
+        raise UserError("the password is not correct")
+    with db.tx() as c:
+        # people this user added to someone else's experiment stay on it: the owner becomes who "added" them
+        c.execute("""UPDATE collaborators SET added_by=(SELECT owner_id FROM experiments e WHERE e.id=collaborators.experiment_id)
+                     WHERE added_by=? AND user_id<>?""", (user["id"], user["id"]))
+        c.execute("DELETE FROM sessions WHERE owner_id=?", (user["id"],))
+        c.execute("DELETE FROM users WHERE id=?", (user["id"],))   # cascades: sessions, tokens, experiments, notes, ...
+    if audio_root is not None:
+        import shutil
+        shutil.rmtree(audio_root / f"u{user['id']}", ignore_errors=True)
