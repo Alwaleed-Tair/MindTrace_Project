@@ -1,5 +1,6 @@
 """Admin helper:   python manage.py create-user "Name" email@lab.com [--lab "Lab"]    (prompts for the password)
-                   python manage.py create-token email@lab.com [--label "laptop"]      (prints a bridge token once)"""
+                   python manage.py create-token email@lab.com [--label "laptop"]      (prints a bridge token once)
+                   python manage.py reset-link email@lab.com [--url http://localhost:8000]  (prints a password reset link)"""
 from __future__ import annotations
 
 import argparse
@@ -25,6 +26,9 @@ def main(argv=None) -> int:
     ct = sub.add_parser("create-token")
     ct.add_argument("email")
     ct.add_argument("--label", default="laptop bridge")
+    rl = sub.add_parser("reset-link")
+    rl.add_argument("email")
+    rl.add_argument("--url", default="")
     a = ap.parse_args(argv)
     st = Settings()
     st.data_dir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +46,11 @@ def main(argv=None) -> int:
     if row is None:
         print("Error: no such user", file=sys.stderr)
         return 1
+    if a.cmd == "reset-link":
+        token = users.create_reset_token(db, row["id"], st.reset_minutes)
+        base = (a.url or st.public_url or "http://localhost:8000").rstrip("/")
+        print(f"{base}/reset-password?token={token}   (valid for {st.reset_minutes} minutes, works once)")
+        return 0
     print(users.create_api_token(db, row["id"], a.label))
     return 0
 
