@@ -21,6 +21,7 @@ class ExperimentIn(BaseModel):
     title: str
     summary: str = ""
     tags: list[str] | None = None
+    team_id: str | None = None           # share with one of your teams from the start
 
 
 class ExperimentPatch(BaseModel):
@@ -29,6 +30,7 @@ class ExperimentPatch(BaseModel):
     title: str | None = None
     summary: str | None = None
     tags: list[str] | None = None
+    team_id: str | None = None           # null = stop sharing with the team
 
 
 class NoteIn(BaseModel):
@@ -65,7 +67,8 @@ def list_experiments(request: Request, status: str | None = Query(None), q: str 
 @router.post("/experiments", status_code=201)
 def create_experiment(body: ExperimentIn, request: Request, user=Depends(current_user)):
     d = db(request)
-    eid = ex.create_experiment(d, user["id"], body.title, body.summary or "A new research thread, ready to be observed.", body.tags or ["New thread"])
+    eid = ex.create_experiment(d, user["id"], body.title, body.summary or "A new research thread, ready to be observed.", body.tags or ["New thread"],
+                               team_id=body.team_id or None)
     return ex.get_experiment(d, eid, user["id"])
 
 
