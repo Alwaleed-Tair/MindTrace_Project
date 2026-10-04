@@ -1,4 +1,4 @@
-import { AudioLines, FlaskConical, LayoutDashboard, Lightbulb, MessageSquareHeart, Settings, Users, X } from 'lucide-react';
+import { LayoutDashboard, MessageSquareHeart, Settings, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { FeedbackDialog } from '@/components/layout/FeedbackDialog';
@@ -19,9 +19,6 @@ export function Sidebar() {
   const active = useExperiments({ status: 'Active', sort: 'newest' });
   const nav = [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, id: 'dashboard' },
-    { href: '/experiments', label: t.navExperiments, icon: FlaskConical, id: 'experiments' },
-    { href: '/hypotheses', label: t.hypothesesTitle, icon: Lightbulb, id: 'hypotheses' },
-    { href: '/recordings', label: t.navRecordings, icon: AudioLines, id: 'recordings' },
     { href: '/team', label: t.navTeam, icon: Users, id: 'team' },
   ];
   const isActive = (href: string) => location === href || (href === '/team' && (location.startsWith('/team/') || location.startsWith('/join/')));
