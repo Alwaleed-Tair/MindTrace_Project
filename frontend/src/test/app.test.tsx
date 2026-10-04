@@ -16,7 +16,7 @@ function signedIn(experiments = [exp()]) {
   A.stats.mockResolvedValue(emptyStats);
   A.notifications.mockResolvedValue({ unread_count: 0, items: [] });
   A.recentCollaborators.mockResolvedValue([lina, omar]);
-  A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, demo_enabled: true, dev_tools: false });
+  A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, dev_tools: false });
   A.insights.mockResolvedValue({ status: 'none', result: null, error: null, updated_at: null, ai_configured: false });
   A.listTeams.mockResolvedValue([]);
 }
@@ -191,7 +191,7 @@ describe('the trace', () => {
     expect(screen.getByTestId('originality-2')).toHaveTextContent('71');
   });
 
-  it('the experiment page trace jumps to a note, and hypotheses are listed', async () => {
+  it('the experiment page trace jumps to a note', async () => {
     signedIn();
     const n = (id: number, kind: 'observation' | 'hypothesis' | 'decision', min: number, text: string) => ({ id, text, kind, source: 'manual' as const, text_source: 'human' as const, time_label: null, created_at: at(min), updated_at: at(min), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true });
     A.getExperiment.mockResolvedValue(exp({ notes: [n(1, 'observation', 0, 'colour turned amber'), n(2, 'hypothesis', 20, 'airflow cools the sample'), n(3, 'decision', 40, 'repeat at 26 degrees')] }));
@@ -201,7 +201,6 @@ describe('the trace', () => {
     await screen.findByTestId('session-trace');
     expect(screen.getByTestId('trace-kinds')).toHaveTextContent('1 observations · 1 hypotheses · 1 decisions');
     expect(screen.getByTestId('note-kind-2')).toHaveTextContent('Hypothesis');
-    expect(within(screen.getByTestId('card-hypotheses')).getByTestId('hypothesis-2')).toHaveTextContent('airflow cools the sample');
     await userEvent.click(screen.getByTestId('trace-mark-3'));
     await waitFor(() => expect(scroll).toHaveBeenCalled());
     // the kind filter keeps only one kind in the timeline
@@ -519,6 +518,15 @@ describe('originality note', () => {
     renderApp('/experiments/1');
     expect(await screen.findByTestId('originality-scale')).toHaveTextContent('Higher is better');
   });
+
+  it('shows no score at all before an analysis', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ ai_status: 'none', originality: 50 }));
+    renderApp('/experiments/1');
+    expect(await screen.findByTestId('originality-pending')).toHaveTextContent('Not analyzed');
+    expect(screen.queryByTestId('originality-scale')).toBeNull();
+    expect(screen.getByTestId('card-originality')).not.toHaveTextContent('50');
+  });
 });
 
 describe('delete experiment', () => {
@@ -581,16 +589,15 @@ describe('sidebar extras', () => {
     expect(await screen.findByTestId('experiments-grid')).toBeInTheDocument();
   });
 
-  it('the sidebar leads to All experiments, Hypotheses and Recordings', async () => {
+  it('the sidebar has Workspace and Team, and nothing else', async () => {
     signedIn();
     renderApp();
     await screen.findByTestId('experiments-grid');
     expect(screen.getByTestId('link-nav-dashboard')).toHaveAttribute('aria-current', 'page');
-    await userEvent.click(screen.getByTestId('link-nav-experiments'));
-    expect(await screen.findByTestId('experiments-page')).toBeInTheDocument();
-    expect(screen.getByTestId('link-nav-experiments')).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('link-nav-hypotheses')).toBeInTheDocument();
-    expect(screen.getByTestId('link-nav-recordings')).toBeInTheDocument();
+    expect(screen.getByTestId('link-nav-team')).toBeInTheDocument();
+    expect(screen.queryByTestId('link-nav-experiments')).toBeNull();
+    expect(screen.queryByTestId('link-nav-hypotheses')).toBeNull();
+    expect(screen.queryByTestId('link-nav-recordings')).toBeNull();
   });
 
   it('Feedback opens a mock form that can be filled and "sent"', async () => {
@@ -733,55 +740,6 @@ describe('the "needs review" badge is only for really uncertain notes', () => {
     expect(screen.getByTestId('note-alt-1')).toBeInTheDocument();
     expect(screen.queryByTestId('note-review-2')).toBeNull();
     expect(screen.queryByTestId('note-alt-2')).toBeNull();
-  });
-});
-
-describe('library pages', () => {
-  const lib = (id: number, over: Record<string, unknown> = {}) => ({ id, text: `note ${id}`, kind: 'hypothesis', source: 'manual', text_source: 'human', time_label: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true,
-    experiment: { id: '1', code: 'EXP-1', title: 'Ambient temperature', status: 'Active' }, ...over });
-
-  it('All experiments lists every experiment with status tabs and counts', async () => {
-    signedIn([exp({ id: '1' }), exp({ id: '2', title: 'Second', code: 'EXP-2', status: 'Paused' })]);
-    renderApp('/experiments');
-    expect(await screen.findByTestId('row-experiment-1')).toHaveTextContent('Ambient temperature');
-    expect(screen.getByTestId('row-experiment-2')).toBeInTheDocument();
-    expect(screen.getByTestId('tab-status-paused')).toHaveTextContent('1');
-    await userEvent.click(screen.getByTestId('tab-status-paused'));
-    await waitFor(() => expect(A.listExperiments).toHaveBeenLastCalledWith({ status: 'Paused', q: '', sort: 'newest' }));
-  });
-
-  it('Hypotheses groups them by experiment and opens one at its place', async () => {
-    signedIn();
-    A.listNotes.mockResolvedValue([lib(7, { text: 'airflow matters' }), lib(8, { text: 'humidity matters', experiment: { id: '2', code: 'EXP-2', title: 'Second', status: 'Paused' } })]);
-    A.getExperiment.mockResolvedValue(exp({ notes: [{ ...lib(7, { text: 'airflow matters' }), experiment: undefined }] as never }));
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
-    renderApp('/hypotheses');
-    await waitFor(() => expect(screen.getByTestId('hypotheses-count')).toHaveTextContent('2 hypotheses across 2 experiments'));
-    expect(A.listNotes).toHaveBeenCalledWith({ kind: 'hypothesis', q: '' });
-    expect(within(screen.getByTestId('hypotheses-group-2')).getByTestId('hypothesis-item-8')).toHaveTextContent('humidity matters');
-    await userEvent.click(screen.getByTestId('hypothesis-item-7'));
-    await screen.findByTestId('experiment-page');
-    await waitFor(() => expect(scroll).toHaveBeenCalled());
-  });
-
-  it('Hypotheses says how to start when there are none', async () => {
-    signedIn();
-    A.listNotes.mockResolvedValue([]);
-    renderApp('/hypotheses');
-    expect(await screen.findByTestId('hypotheses-page-empty')).toHaveTextContent('choose "Hypothesis"');
-  });
-
-  it('Recordings lists recorded notes and can show only the uncertain ones', async () => {
-    signedIn();
-    A.listNotes.mockResolvedValue([lib(3, { kind: 'observation', source: 'recording', text_source: 'asr', time_label: '00:25', asr: { language: 'ar', confidence: 0.6, needs_review: true, language_rechecked: false, alternative: null } })]);
-    renderApp('/recordings');
-    expect(await screen.findByTestId('recording-3')).toHaveTextContent('Confidence 60%');
-    expect(screen.getByTestId('recording-review-3')).toBeInTheDocument();
-    expect(A.listNotes).toHaveBeenCalledWith({ source: 'recording', q: '', review: false });
-    await userEvent.click(screen.getByTestId('filter-recordings-review'));
-    await waitFor(() => expect(A.listNotes).toHaveBeenLastCalledWith({ source: 'recording', q: '', review: true }));
   });
 });
 
