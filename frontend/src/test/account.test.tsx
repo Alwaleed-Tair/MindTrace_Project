@@ -19,7 +19,7 @@ function signedIn() {
   A.stats.mockResolvedValue(emptyStats);
   A.notifications.mockResolvedValue({ unread_count: 0, items: [] });
   A.recentCollaborators.mockResolvedValue([]);
-  A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, demo_enabled: true, dev_tools: false });
+  A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, dev_tools: false });
   A.insights.mockResolvedValue({ status: 'none', result: null, error: null, updated_at: null, ai_configured: false });
 }
 

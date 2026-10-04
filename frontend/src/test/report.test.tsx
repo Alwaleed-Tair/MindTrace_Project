@@ -93,7 +93,7 @@ describe('export from the experiment page', () => {
     A.stats.mockResolvedValue(emptyStats);
     A.notifications.mockResolvedValue({ unread_count: 0, items: [] });
     A.recentCollaborators.mockResolvedValue([]);
-    A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, demo_enabled: true, dev_tools: false });
+    A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, dev_tools: false });
     A.insights.mockResolvedValue(notAnalysed);
     A.getExperiment.mockResolvedValue(exp({ notes: [n(7, { text: 'first reading' })] }));
   });
