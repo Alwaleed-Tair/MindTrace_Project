@@ -64,7 +64,7 @@ def create_app(settings: Settings | None = None, ai_client: httpx.Client | None 
             db.one("SELECT 1")
         except Exception:
             ok_db = False
-        return {"ok": ok_db, "version": API_VERSION, "ai_configured": st.ai_configured, "demo_enabled": st.demo_enabled,
+        return {"ok": ok_db, "version": API_VERSION, "ai_configured": st.ai_configured,
                 "dev_tools": st.dev_tools}
 
     for r in (auth.router, experiments.router, misc.router, sessions.router, teams.router):
