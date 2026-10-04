@@ -10,7 +10,6 @@ interface AuthValue {
   status: Status;
   login: (email: string, password: string, remember: boolean) => Promise<void>;
   register: (name: string, email: string, password: string, lab: string) => Promise<void>;
-  demo: () => Promise<void>;
   logout: () => Promise<void>;
   recheck: () => Promise<void>;
   /** After editing the profile: show the new name and lab everywhere. */
@@ -59,7 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       recheck,
       login: async (email, password, remember) => enter((await api.login(email, password, remember)).user),
       register: async (name, email, password, lab) => enter((await api.register(name, email, password, lab)).user),
-      demo: async () => enter((await api.demo()).user),
       resetPassword: async (token, password) => enter((await api.resetPassword(token, password)).user),
       updateUser: (u) => setUser(u),
       signedOut: () => {
