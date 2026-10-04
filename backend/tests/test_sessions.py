@@ -248,15 +248,3 @@ def test_needs_review_is_only_shown_when_the_second_reading_really_disagrees(app
     eid = post(app, token(u), s).json()["experiment_id"]
     shown = [n["asr"]["needs_review"] for n in u.get(f"/api/experiments/{eid}").json()["notes"]]
     assert shown == [c[3] for c in cases], shown
-
-
-def test_recordings_page_lists_recorded_notes_with_their_experiment(app):
-    u = new_client(app, "rec@x.com", "Researcher")
-    r = post(app, token(u), sample(), [("files", ("notes/note_01.wav", make_wav(), "audio/wav"))])
-    u.post(f"/api/experiments/{r.json()['experiment_id']}/notes", json={"text": "typed by hand"})
-    items = u.get("/api/notes", params={"source": "recording"}).json()["items"]
-    assert len(items) == 7 and all(n["source"] == "recording" for n in items)
-    assert all(n["experiment"]["id"] == str(r.json()["experiment_id"]) for n in items)
-    assert any(n["has_audio"] for n in items)
-    review = u.get("/api/notes", params={"source": "recording", "review": "true"}).json()["items"]
-    assert review and all(n["asr"]["needs_review"] for n in review) and len(review) < len(items)

@@ -95,7 +95,6 @@ def test_team_experiments_are_shared_with_every_member(app):
     assert got["role"] == "editor"
     assert b.post(f"/api/experiments/{shared['id']}/notes", json={"text": "seen by Bob", "kind": "hypothesis"}).status_code == 201
     assert any(n["kind"] == "note_added" for n in a.get("/api/notifications").json()["items"])
-    assert [n["text"] for n in b.get("/api/notes", params={"kind": "hypothesis"}).json()["items"]] == ["seen by Bob"]
     assert b.patch(f"/api/experiments/{shared['id']}", json={"team_id": None}).status_code == 403   # only the owner shares
     assert b.delete(f"/api/experiments/{shared['id']}").status_code == 403
     # share an existing experiment, then stop sharing

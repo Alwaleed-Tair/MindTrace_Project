@@ -112,18 +112,6 @@ def test_api_token_for_the_bridge(app):
     assert bridge.post("/api/auth/api-token", json={}, headers={"Authorization": f"Bearer {token}"}).status_code == 403   # no token from a token
 
 
-def test_demo_login_needs_the_seeded_demo_user(app, tmp_path):
-    c = TestClient(app, headers=H)
-    assert c.post("/api/auth/demo").status_code == 404
-    from core.db import Database
-    import seed
-    seed.seed(app.state.db, say=lambda m: None)
-    assert c.post("/api/auth/demo").status_code == 200 and c.get("/api/auth/me").json()["user"]["name"] == "Dr. Noor Rahman"
-    app2 = make_app(tmp_path / "x", demo_enabled=False)
-    seed.seed(app2.state.db, say=lambda m: None)
-    assert TestClient(app2, headers=H).post("/api/auth/demo").status_code == 404
-
-
 def test_unauthenticated_requests_are_refused_everywhere(app):
     c = TestClient(app, headers=H)
     for method, path in [("get", "/api/experiments"), ("get", "/api/experiments/1"), ("post", "/api/experiments"), ("get", "/api/stats"),

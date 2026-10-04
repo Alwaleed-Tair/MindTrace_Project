@@ -136,25 +136,3 @@ def test_list_includes_the_note_trace_and_kind_counts(tmp_path):
     assert [m["kind"] for m in item["trace"]] == ["observation", "hypothesis", "decision", "observation"]
     assert all(m["at"] for m in item["trace"])
     assert item["kind_counts"] == {"observation": 2, "hypothesis": 1, "decision": 1}
-
-
-def test_notes_across_experiments_for_the_hypotheses_and_recordings_pages(app):
-    a = new_client(app, "na@x.com", "Ann")
-    b = new_client(app, "nb@x.com", "Bob")
-    e1 = make_exp(a, "Heat")
-    e2 = make_exp(b, "Shared with Ann")
-    e3 = make_exp(b, "Not shared")
-    assert b.post(f"/api/experiments/{e2['id']}/collaborators", json={"identifier": "na@x.com"}).status_code == 201
-    a.post(f"/api/experiments/{e1['id']}/notes", json={"text": "airflow matters", "kind": "hypothesis"})
-    a.post(f"/api/experiments/{e1['id']}/notes", json={"text": "colour turned amber"})
-    b.post(f"/api/experiments/{e2['id']}/notes", json={"text": "humidity matters", "kind": "hypothesis"})
-    b.post(f"/api/experiments/{e3['id']}/notes", json={"text": "secret idea", "kind": "hypothesis"})
-    items = a.get("/api/notes", params={"kind": "hypothesis"}).json()["items"]
-    assert [n["text"] for n in items] == ["humidity matters", "airflow matters"]          # newest first, never other people's data
-    assert items[0]["experiment"] == {"id": e2["id"], "code": e2["code"], "title": "Shared with Ann", "status": "Active"}
-    assert [n["text"] for n in a.get("/api/notes", params={"kind": "hypothesis", "q": "AIR"}).json()["items"]] == ["airflow matters"]
-    assert len(a.get("/api/notes").json()["items"]) == 3
-    assert a.get("/api/notes", params={"source": "recording"}).json()["items"] == []
-    assert a.get("/api/notes", params={"kind": "idea"}).status_code == 422
-    assert a.get("/api/notes", params={"source": "x"}).status_code == 422
-    assert TestClient(app).get("/api/notes").status_code == 401

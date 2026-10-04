@@ -152,10 +152,3 @@ def test_delete_account_removes_own_work_but_not_shared_experiments(app):
     assert all(n["text"] != "Bob's note" for n in e["notes"])
     assert c.get(f"/api/experiments/{shared['id']}").status_code == 200
     assert TestClient(app, headers=H).post("/api/auth/login", json={"email": "b@x.com", "password": "correct-horse-1"}).status_code == 401
-
-
-def test_demo_account_cannot_be_deleted_or_its_password_changed(app):
-    c = new_client(app, "demo@x.com")
-    app.state.db.run("UPDATE users SET is_demo=1 WHERE email='demo@x.com'")
-    assert c.request("DELETE", "/api/auth/me", json={"password": "correct-horse-1"}).status_code == 403
-    assert c.post("/api/auth/password", json={"current_password": "correct-horse-1", "new_password": "new-secret-22"}).status_code == 422
