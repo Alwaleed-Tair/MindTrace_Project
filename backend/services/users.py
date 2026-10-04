@@ -35,7 +35,7 @@ def public(row, include_email: bool = True) -> dict:
     return d
 
 
-def create_user(db: Database, name: str, email: str, password: str, lab: str = "", is_demo: bool = False):
+def create_user(db: Database, name: str, email: str, password: str, lab: str = ""):
     name, email, lab = name.strip(), email.strip().lower(), lab.strip()
     if not name or len(name) > 80:
         raise UserError("name is required (max 80 characters)")
@@ -49,8 +49,8 @@ def create_user(db: Database, name: str, email: str, password: str, lab: str = "
         pid = security.new_public_id()
         if not db.one("SELECT 1 FROM users WHERE public_id=?", (pid,)):
             break
-    uid = db.run("INSERT INTO users (public_id, email, name, lab, password_hash, is_demo, created_at) VALUES (?,?,?,?,?,?,?)",
-                 (pid, email, name, lab[:80], security.hash_password(password), int(is_demo), iso()))
+    uid = db.run("INSERT INTO users (public_id, email, name, lab, password_hash, created_at) VALUES (?,?,?,?,?,?)",
+                 (pid, email, name, lab[:80], security.hash_password(password), iso()))
     return db.one("SELECT * FROM users WHERE id=?", (uid,))
 
 
@@ -161,8 +161,6 @@ def set_password(db: Database, user_id: int, new_password: str, keep_session_tok
 
 
 def change_password(db: Database, user, current_password: str, new_password: str, session_token: str | None) -> None:
-    if user["is_demo"]:
-        raise UserError("the shared demo account's password cannot be changed")
     if not security.verify_password(current_password, user["password_hash"]):
         raise UserError("the current password is not correct")
     if current_password == new_password:
@@ -195,8 +193,6 @@ def reset_password(db: Database, token: str, new_password: str):
 def delete_account(db: Database, user, password: str, audio_root=None) -> None:
     """Removes the user, the experiments they own (with notes and recordings) and their notes in other people's
     experiments. Experiments they only collaborate on stay with their owners."""
-    if user["is_demo"]:
-        raise UserError("the shared demo account cannot be deleted")
     if not security.verify_password(password, user["password_hash"]):
         raise UserError("the password is not correct")
     with db.tx() as c:

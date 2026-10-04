@@ -164,41 +164,6 @@ def list_experiments(db: Database, user_id: int, status: str | None = None, q: s
     return out
 
 
-def list_notes(db: Database, user_id: int, kind: str | None = None, source: str | None = None, q: str = "",
-               review_only: bool = False, limit: int = 300) -> list[dict]:
-    """Notes across every experiment the user can see (owned or shared), newest first, each with its experiment.
-    Powers the Hypotheses and Recordings pages."""
-    sql = f"""SELECT n.* FROM notes n JOIN experiments e ON e.id=n.experiment_id WHERE {VISIBLE}"""
-    args: list = [user_id, user_id, user_id]
-    if kind:
-        sql += " AND n.kind=?"
-        args.append(kind)
-    if source:
-        sql += " AND n.source=?"
-        args.append(source)
-    rows = db.all(sql + " ORDER BY n.created_at DESC, n.id DESC", tuple(args))
-    exps: dict[int, dict] = {}
-    files: dict[int, set] = {}
-    out = []
-    for n in rows:
-        if q and q.lower() not in (n["text"] or "").lower():
-            continue
-        eid = n["experiment_id"]
-        if eid not in exps:
-            e = db.one("SELECT id, code, title, status, owner_id FROM experiments WHERE id=?", (eid,))
-            exps[eid] = {"id": str(e["id"]), "code": e["code"], "title": e["title"], "status": e["status"], "owner_id": e["owner_id"]}
-            files[eid] = audio_files_of(db, eid)
-        e = exps[eid]
-        item = serialize_note(db, n, user_id, e["owner_id"], files[eid])
-        if review_only and not (item["asr"] or {}).get("needs_review"):
-            continue
-        item["experiment"] = {k: v for k, v in e.items() if k != "owner_id"}
-        out.append(item)
-        if len(out) >= limit:
-            break
-    return out
-
-
 def get_experiment(db: Database, exp_id: int, user_id: int) -> dict:
     require(db, exp_id, user_id)
     return serialize(db, db.one("SELECT * FROM experiments WHERE id=?", (exp_id,)), user_id, with_notes=True)
