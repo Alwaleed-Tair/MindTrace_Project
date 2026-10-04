@@ -106,17 +106,6 @@ def login(body: LoginIn, request: Request, response: Response):
     return {"user": users_service.public(user)}
 
 
-@router.post("/demo")
-def demo(request: Request, response: Response):
-    """Opens the seeded demo account (no password typed). Off unless MINDTRACE_DEMO_ENABLED and the demo user exists."""
-    d, st = db(request), settings(request)
-    row = d.one("SELECT * FROM users WHERE is_demo=1 ORDER BY id LIMIT 1")
-    if not st.demo_enabled or row is None:
-        raise HTTPException(404, "the demo workspace is not available (run the seed script)")
-    _set_cookie(response, request, users_service.start_session(d, row["id"], 1), False)
-    return {"user": users_service.public(row)}
-
-
 @router.post("/logout")
 def logout(request: Request, response: Response):
     token = request.cookies.get(COOKIE)
@@ -169,7 +158,7 @@ def forgot_password(body: ForgotIn, request: Request):
     _check_throttle(request, key)
     request.app.state.login_fails.setdefault(key, []).append(time.monotonic())   # at most MAX_FAILS requests per window
     row = d.one("SELECT * FROM users WHERE email=?", (body.email.strip().lower(),))
-    if row is not None and not row["is_demo"]:
+    if row is not None:
         token = users_service.create_reset_token(d, row["id"], st.reset_minutes)
         base = st.public_url or str(request.base_url).rstrip("/")
         link = f"{base}/reset-password?token={token}"
@@ -200,6 +189,6 @@ def delete_me(body: DeleteAccountIn, request: Request, response: Response, user=
     try:
         users_service.delete_account(db(request), user, body.password, settings(request).audio_dir)
     except UserError as exc:
-        raise HTTPException(403 if "demo" in str(exc) else 422, str(exc)) from exc
+        raise HTTPException(422, str(exc)) from exc
     response.delete_cookie(COOKIE, path="/")
     return {"ok": True}

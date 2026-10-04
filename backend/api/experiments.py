@@ -95,16 +95,6 @@ def add_note(exp_id: str, body: NoteIn, request: Request, user=Depends(current_u
     return ex.add_note(db(request), _id(exp_id), user["id"], body.text, body.kind)
 
 
-@router.get("/notes")
-def list_notes(request: Request, kind: str | None = Query(None), source: str | None = Query(None, pattern="^(manual|recording)$"),
-               q: str = Query("", max_length=100), review: bool = Query(False), limit: int = Query(300, ge=1, le=500),
-               user=Depends(current_user)):
-    """Notes from all the user's experiments: ?kind=hypothesis for the Hypotheses page, ?source=recording for Recordings."""
-    if kind and kind not in ex.NOTE_KINDS:
-        raise HTTPException(422, f"kind must be one of {', '.join(ex.NOTE_KINDS)}")
-    return {"items": ex.list_notes(db(request), user["id"], kind, source, q.strip(), review, limit)}
-
-
 @router.patch("/notes/{note_id}")
 def patch_note(note_id: int, body: NotePatch, request: Request, user=Depends(current_user)):
     return ex.update_note(db(request), note_id, user["id"], body.model_dump(exclude_unset=True))
