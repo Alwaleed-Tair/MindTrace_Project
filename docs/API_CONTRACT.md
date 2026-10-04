@@ -7,7 +7,7 @@
 - **الواجهة (متصفح):** cookie اسمه `mt_session` (HttpOnly، SameSite=Lax). كل طلب كتابة (`POST/PATCH/DELETE`) لازم يحمل الهيدر `X-Requested-With: mindtrace` (حماية CSRF).
 - **الجسر (laptop bridge):** `Authorization: Bearer mt_...` (token ينشئه المستخدم من Settings). ما يحتاج الهيدر الثاني.
 - كلمات المرور تُخزَّن مشفّرة (scrypt). 5 محاولات دخول خاطئة تُوقف الحساب 5 دقائق (429).
-- مستخدم **لا يرى ولا يعدّل** تجارب غيره: أي تجربة ليست له ترجع `404` (نفس جواب "غير موجودة").
+- مستخدم **لا يرى ولا يعدّل** تجارب غيره: أي تجربة أو فريق ليس له يرجع `404` (نفس جواب "غير موجود"). "له" تعني: مالكها، أو متعاون فيها، أو عضو في الفريق المشتركة معه.
 
 ## جدول الـ endpoints
 
@@ -16,15 +16,19 @@
 | GET | `/api/health` | حالة الخادم، هل DeepSeek مفعّل، هل الديمو متاح | لا |
 | POST | `/api/auth/register` | حساب جديد `{name,email,password(≥8),lab?}` ويدخل مباشرة | لا |
 | POST | `/api/auth/login` | `{email,password,remember}` | لا |
-| POST | `/api/auth/demo` | فتح مساحة العرض (بعد `python seed.py`) | لا |
 | POST | `/api/auth/logout` | | نعم |
 | GET | `/api/auth/me` | المستخدم الحالي (فيه `id` الفريد `MT-XXXXXXXX`) | نعم |
 | POST | `/api/auth/api-token` | token للجسر (يظهر مرة وحدة، يُخزَّن hash فقط) | cookie |
+| PATCH | `/api/auth/me` | `{name?,lab?}` تعديل الاسم والمختبر (البريد ثابت) | نعم |
+| POST | `/api/auth/password` | `{current_password,new_password}`؛ تنهي الجلسات الأخرى وتبقي الحالية | نعم |
+| POST | `/api/auth/forgot` | `{email}` رابط استعادة صالح 60 دقيقة (يُرسل بالبريد أو يُكتب في سجل الخادم)؛ الرد واحد سواء البريد موجود أو لا | لا |
+| POST | `/api/auth/reset` | `{token,new_password}` يستخدم الرابط مرة وحدة وينهي كل الجلسات | لا |
+| DELETE | `/api/auth/me` | `{password}` حذف الحساب وتجاربه وملاحظاته وفرقه | نعم |
 | GET | `/api/stats` | أرقام لوحة التحكم + ملخص الرؤى | نعم |
 | GET | `/api/experiments?status=&q=&sort=` | تجاربي والمشاركة معي | نعم |
-| POST | `/api/experiments` | `{title,summary?,tags?}` | نعم |
+| POST | `/api/experiments` | `{title,summary?,tags?,team_id?}` | نعم |
 | GET | `/api/experiments/{id}` | التجربة + النوتس + المتعاونون | نعم |
-| PATCH | `/api/experiments/{id}` | `{status}` (أي عضو) أو `{title,summary,tags}` (المالك) | نعم |
+| PATCH | `/api/experiments/{id}` | `{status}` (أي عضو) أو `{title,summary,tags,team_id}` (المالك؛ `team_id: null` يلغي المشاركة مع الفريق) | نعم |
 | DELETE | `/api/experiments/{id}` | المالك فقط. يحذف النوتس والتعاون والإشعارات والتسجيل الأصلي وملفات الصوت | نعم |
 | POST | `/api/experiments/{id}/notes` | `{text,kind?}` | نعم |
 | PATCH | `/api/notes/{id}` | `{text?,kind?}` الكاتب أو المالك | نعم |
@@ -34,6 +38,17 @@
 | GET | `/api/collaborators/recent` | آخر من أضفتهم | نعم |
 | POST | `/api/experiments/{id}/collaborators` | `{identifier}` بريد أو `MT-XXXXXXXX` | نعم |
 | DELETE | `/api/experiments/{id}/collaborators/{userId}` | المالك فقط | نعم |
+| GET | `/api/teams` | فرقي `{items:[{id,name,role,member_count,experiment_count}]}` | نعم |
+| POST | `/api/teams` | `{name}` إنشاء فريق؛ المنشئ مالكه | نعم |
+| GET | `/api/teams/{id}` | الفريق مع `members` (الدور، التجارب، ملاحظات 14 يوم) و`experiments`؛ `invite_token` للمالك والمشرف فقط | عضو |
+| PATCH | `/api/teams/{id}` | `{name}` | المالك |
+| DELETE | `/api/teams/{id}` | حذف الفريق؛ التجارب تبقى عند أصحابها | المالك |
+| POST | `/api/teams/{id}/members` | `{identifier, role?}` بريد أو `MT-…`؛ `role` = `member` (المالك والمشرف) أو `supervisor` (المالك فقط) | المالك/المشرف |
+| PATCH | `/api/teams/{id}/members/{userId}` | `{role}` بين `member` و`supervisor` | المالك |
+| DELETE | `/api/teams/{id}/members/{userId}` | إزالة عضو أو مغادرة؛ المشرف يزيل الأعضاء فقط، والمالك لا يغادر | عضو |
+| POST | `/api/teams/{id}/invite` | رابط دعوة جديد (القديم يتوقف) | المالك/المشرف |
+| GET | `/api/invites/{token}` | معاينة: الفريق ومنشئه وعدد أعضائه و`already_member` | نعم |
+| POST | `/api/invites/{token}/accept` | الانضمام كعضو | نعم |
 | GET | `/api/notifications?unread=&limit=` | `{unread_count, items}` | نعم |
 | POST | `/api/notifications/read` | `{ids?}` بدون ids = الكل | نعم |
 | GET | `/api/experiments/{id}/insights?language=ar\|en` | حالة ونتيجة مراجعة DeepSeek. لو اللغة المطلوبة غير لغة التحليل وفي ترجمة محفوظة تُعاد مترجمة، وإلا `needs_translation: true` | نعم |
@@ -61,14 +76,16 @@
  "duration":"01:42:18","originality":82,"tags":["Catalysis"],"color":"mint",
  "created_at":"...","updated_at":"...","role":"owner|editor","owner":{"id":"MT-...","name":"...","lab":"...","initials":"NR"},
  "collaborators":[{"id":"MT-...","name":"...","initials":"LH"}],"note_count":2,"session_id":null,"ai_status":"none",
+ "team":{"id":"1","name":"Materials lab"},
+ "trace":[{"at":"...","kind":"observation","time_label":"01:12"}],"kind_counts":{"observation":5,"hypothesis":1,"decision":0},
  "notes":[{"id":5,"text":"...","kind":"observation|hypothesis|decision","source":"manual|recording","text_source":"human|asr",
            "time_label":"01:12","created_at":"...","author":{},"has_audio":true,"can_edit":true,
            "asr":{"language":"Arabic","confidence":0.63,"needs_review":true,"alternative":{"engine":"faster-whisper","model":"turbo","text":"..."}}}]}
 ```
-(`notes` تظهر في `GET /experiments/{id}` فقط.) **`needs_review` تلميح مو دليل**: نص غلط ممكن يطلع بثقة عالية، والصوت هو المرجع.
+(`notes` تظهر في `GET /experiments/{id}` فقط. `trace` = آخر 40 ملاحظة بوقتها ونوعها، ترسمها بطاقة التجربة. `team` = الفريق المشتركة معه أو `null`. `originality` لا تعرضه الواجهة إلا بعد اكتمال التحليل.) **`needs_review` تلميح مو دليل**: نص غلط ممكن يطلع بثقة عالية، والصوت هو المرجع.
 
 ## الإشعارات
-`kind`: `note_added` · `note_updated` · `collaborator_added` · `status_changed`. تُنشأ لكل أعضاء التجربة **ما عدا من قام بالفعل**. الواجهة تستعلم كل 4 ثواني.
+`kind`: `note_added` · `note_updated` · `collaborator_added` · `status_changed` · `team_added` · `team_joined`. تُنشأ لكل أعضاء التجربة (بما فيهم أعضاء فريقها) **ما عدا من قام بالفعل**. إشعارات الفريق بدون `experiment`. الواجهة تستعلم كل 4 ثواني.
 
 ## مراجعة DeepSeek
 `ai.status`: `none` · `disabled` (ما في مفتاح) · `queued` · `running` · `done` · `failed` (مع `error`). النتيجة:
