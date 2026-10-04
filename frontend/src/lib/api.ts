@@ -1,4 +1,4 @@
-import type { Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, LibraryNote, Team, TeamDetail, InvitePreview } from './types';
+import type { Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, Team, TeamDetail, InvitePreview } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -57,7 +57,6 @@ export const api = {
   me: () => get<{ user: Person }>('/auth/me'),
   login: (email: string, password: string, remember: boolean) => post<{ user: Person }>('/auth/login', { email, password, remember }),
   register: (name: string, email: string, password: string, lab: string) => post<{ user: Person }>('/auth/register', { name, email, password, lab }),
-  demo: () => post<{ user: Person }>('/auth/demo'),
   logout: () => post<{ ok: boolean }>('/auth/logout'),
   createApiToken: (label: string) => post<{ token: string; label: string }>('/auth/api-token', { label }),
   updateProfile: (fields: { name?: string; lab?: string }) => patch<{ user: Person }>('/auth/me', fields),
@@ -93,14 +92,6 @@ export const api = {
   updateExperiment: (id: string, fields: { title?: string; summary?: string }) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, fields),
 
   addNote: (id: string, text: string, kind: NoteKind = 'observation') => post<Note>(`/experiments/${encodeURIComponent(id)}/notes`, { text, kind }),
-  listNotes: (p: { kind?: NoteKind; source?: 'manual' | 'recording'; q?: string; review?: boolean } = {}) => {
-    const qs = new URLSearchParams();
-    if (p.kind) qs.set('kind', p.kind);
-    if (p.source) qs.set('source', p.source);
-    if (p.q) qs.set('q', p.q);
-    if (p.review) qs.set('review', 'true');
-    return get<{ items: LibraryNote[] }>(`/notes${qs.size ? `?${qs}` : ''}`).then((r) => r.items);
-  },
   updateNote: (noteId: number, text: string) => patch<Note>(`/notes/${noteId}`, { text }),
   deleteNote: (noteId: number) => del(`/notes/${noteId}`),
 

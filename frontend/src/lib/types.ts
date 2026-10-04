@@ -62,11 +62,6 @@ export interface Experiment {
   team?: { id: string; name: string } | null;
 }
 
-/** A note listed outside its experiment (Hypotheses and Recordings pages), with the experiment it belongs to. */
-export interface LibraryNote extends Note {
-  experiment: { id: string; code: string; title: string; status: Status };
-}
-
 export interface TraceMark {
   at: string;
   kind: NoteKind;
@@ -152,7 +147,6 @@ export interface Health {
   ok: boolean;
   version: string;
   ai_configured: boolean;
-  demo_enabled: boolean;
   dev_tools: boolean;
 }
 
