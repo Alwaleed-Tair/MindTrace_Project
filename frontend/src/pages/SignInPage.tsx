@@ -22,7 +22,7 @@ const inputClass = 'min-w-0 flex-1 bg-transparent text-sm outline-none placehold
 
 export default function SignInPage() {
   const { t, language, dir } = usePreferences();
-  const { login, register, demo, status, recheck } = useAuth();
+  const { login, register, status, recheck } = useAuth();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [forgotDone, setForgotDone] = useState<null | { emailConfigured: boolean }>(null);
   const [name, setName] = useState('');
@@ -125,9 +125,6 @@ export default function SignInPage() {
             <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); setForgotDone(null); }} className="mt-4 w-full text-center text-xs font-semibold text-primary hover:underline" data-testid="button-switch-mode">
               {mode === 'login' ? t.noAccount : mode === 'forgot' ? t.backToSignIn : t.haveAccount}
             </button>
-            <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[.18em] text-muted-foreground/60"><span className="h-px flex-1 bg-border" />{t.or}<span className="h-px flex-1 bg-border" /></div>
-            <button type="button" disabled={busy} onClick={() => void run(demo)} className="flex w-full items-center justify-center rounded-xl border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:bg-muted disabled:opacity-60" data-testid="button-enter-demo">{t.demo}</button>
-            <p className="mt-4 text-center text-[11px] text-muted-foreground">{t.demoSub}</p>
           </div>
         </div>
       </section>

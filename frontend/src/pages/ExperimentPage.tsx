@@ -1,4 +1,4 @@
-import { ArrowLeft, AudioLines, Clock3, FileText, Lightbulb, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { StatusPill } from '@/components/common/StatusPill';
@@ -20,7 +20,6 @@ import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
 import { clockTime, fill, relativeTime } from '@/lib/format';
 import { kindLabel } from '@/lib/report';
-import { takePendingNote } from '@/lib/jump';
 import type { Experiment, Note } from '@/lib/types';
 
 type Tab = 'overview' | 'insights';
@@ -63,12 +62,6 @@ function Detail({ experiment }: { experiment: Experiment }) {
     }
     dictation.toggle();
   };
-  // opened from the Hypotheses or Recordings page: go straight to that note
-  useEffect(() => {
-    const id = takePendingNote();
-    if (id !== null) jumpTo(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -82,8 +75,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
   const when = (n: Note) => n.time_label ?? clockTime(n.created_at, language);
   const points = notes.map((n, i) => ({ id: n.id, pos: pos[i], kind: n.kind, label: `${kindLabel(n.kind, t)} · ${when(n)} · ${n.text.slice(0, 80)}` }));
   const count = (k: Note['kind']) => notes.filter((n) => n.kind === k).length;
-  const hypotheses = notes.filter((n) => n.kind === 'hypothesis');
-  // jump to a note from the trace or the hypotheses list, and flash it so the eye finds it
+  // jump to a note from the trace, and flash it so the eye finds it
   const jumpTo = (id: number) => {
     setTab('overview');
     setTimeout(() => {
@@ -209,26 +201,6 @@ function Detail({ experiment }: { experiment: Experiment }) {
             <NotesTimeline experimentId={experiment.id} notes={notes} showAuthors={shared} ignoredIds={ignoredIds} />
             <aside className="space-y-5">
               <AddNoteCard experimentId={experiment.id} text={draft} onText={setDraft} dictation={dictation} />
-              <section className="surface p-5" data-testid="card-hypotheses">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{t.hypothesesTitle}</h3>
-                  <Lightbulb size={15} style={{ color: kindColor('hypothesis') }} />
-                </div>
-                {hypotheses.length ? (
-                  <ul className="mt-3 space-y-2">
-                    {hypotheses.map((h) => (
-                      <li key={h.id}>
-                        <button type="button" onClick={() => jumpTo(h.id)} className="w-full rounded-xl border-s-[3px] bg-kind-hyp-soft/70 px-3 py-2.5 text-start text-xs leading-5 transition hover:bg-kind-hyp-soft" style={{ borderColor: kindColor('hypothesis') }} data-testid={`hypothesis-${h.id}`}>
-                          <span className="line-clamp-3" dir="auto">{h.text}</span>
-                          <span className="mt-1 block font-mono text-[10px] text-muted-foreground">{when(h)}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground" data-testid="hypotheses-empty">{t.noHypotheses}</p>
-                )}
-              </section>
               <OriginalityCard experiment={experiment} />
             </aside>
           </div>
