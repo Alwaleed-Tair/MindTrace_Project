@@ -81,8 +81,15 @@ export function OriginalityCard({ experiment }: { experiment: Experiment }) {
         </div>
         <Lightbulb size={16} className="text-primary" />
       </div>
-      <div className="mt-4 flex justify-center"><CircularScore value={score} /></div>
-      <p className="mt-3 text-center text-[11px] text-muted-foreground" data-testid="originality-scale">{t.origScale}</p>
+      {hasLit || experiment.ai_status === 'done' ? (
+        <>
+          <div className="mt-4 flex justify-center"><CircularScore value={score} /></div>
+          <p className="mt-3 text-center text-[11px] text-muted-foreground" data-testid="originality-scale">{t.origScale}</p>
+        </>
+      ) : (
+        // no score before an analysis: the stored default (50) is not a real estimate
+        <p className="mt-4 rounded-xl bg-muted/60 px-3 py-3 text-center text-sm font-semibold text-muted-foreground" data-testid="originality-pending">{t.notAnalyzed}</p>
+      )}
       <p className="mt-4 text-xs leading-6 text-muted-foreground" dir="auto" data-testid="originality-rationale">{hasLit ? lit!.rationale : literatureNote(lit, t)}</p>
       {hasLit && (
         <>
