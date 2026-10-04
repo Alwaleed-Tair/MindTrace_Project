@@ -19,7 +19,6 @@ class Settings:
     env: str = field(default_factory=lambda: os.environ.get("MINDTRACE_ENV", "development"))
     cookie_secure: bool = field(default_factory=lambda: _flag("MINDTRACE_COOKIE_SECURE", False))    # true when served over https
     session_days: int = field(default_factory=lambda: int(os.environ.get("MINDTRACE_SESSION_DAYS", "30")))
-    demo_enabled: bool = field(default_factory=lambda: _flag("MINDTRACE_DEMO_ENABLED", True))       # "Open demo workspace" button
     dev_tools: bool = field(default_factory=lambda: _flag("MINDTRACE_DEV_TOOLS", False))            # mock collaborator endpoints
     frontend_dir: Path = field(default_factory=lambda: Path(os.environ.get("MINDTRACE_FRONTEND_DIR", "../frontend/dist")))
     max_upload_mb: int = field(default_factory=lambda: int(os.environ.get("MINDTRACE_MAX_UPLOAD_MB", "300")))
