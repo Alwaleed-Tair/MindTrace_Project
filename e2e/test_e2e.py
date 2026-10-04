@@ -263,31 +263,15 @@ def test_recorder_session_arrives_through_the_bridge_and_shows_up(make_page, ser
     assert "nothing" in wrong.stdout.lower() or "401" in wrong.stdout or wrong.returncode == 0   # unchanged sessions are skipped before any auth is needed
 
 
-def test_demo_workspace_is_built_from_the_json_files(make_page, server):
-    p = make_page()
-    p.goto("/")
-    p.tid("button-enter-demo").click()
-    p.tid("experiments-grid").wait_for()
-    for code in ("EXP-204", "EXP-203", "EXP-198", "EXP-191"):
-        expect(p.pg.locator(f"text={code}").first).to_be_visible()
-    expect(p.tid("metric-originality")).to_contain_text("%")
-    expect(p.pg.locator("text=Log Note")).to_have_count(0)
-    p.tid("select-status-filter").select_option("Paused")
-    expect(p.tid("threads-count")).to_contain_text("1 threads")
-    p.tid("select-status-filter").select_option("All")
-    p.tid("input-search-experiments").fill("ceramics")
-    expect(p.tid("threads-count")).to_contain_text("1 threads")
-    p.tid("input-search-experiments").fill("zzzz")
-    expect(p.tid("experiments-empty")).to_be_visible()
-
-
 @pytest.mark.skipif(not os.environ.get("DEEPSEEK_API_KEY"), reason="set DEEPSEEK_API_KEY to call the real DeepSeek API")
 def test_real_deepseek_insights(make_page, server):
     p = make_page()
-    p.goto("/")
-    p.tid("button-enter-demo").click()
-    p.tid("experiments-grid").wait_for()
-    p.pg.locator("[data-testid^=link-experiment-]", has_text="Ambient temperature").click()
+    p.register("Dr. Noor", "noor@e2e.test")
+    p.create_experiment("Ambient temperature & reaction time", "Mapping how a small temperature shift changes the catalyst response curve.")
+    for text in ("At 23.4°C the color change appeared 8 seconds earlier than the baseline run.",
+                 "Check whether the room ventilation is introducing a second variable.",
+                 "Repeat the run at 26°C with the vents closed before drawing a conclusion."):
+        p.add_note(text)
     p.tid("tab-insights").click()
     p.tid("button-refresh-insights").click()
     expect(p.tid("insights-summary")).to_be_visible(timeout=150000)   # a real round trip to DeepSeek

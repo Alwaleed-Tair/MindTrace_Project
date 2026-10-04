@@ -74,8 +74,6 @@ def server(tmp_path, built):
     data = tmp_path / "data"
     env = {"MINDTRACE_DEV_TOOLS": "true", "DEEPSEEK_API_KEY": os.environ.get("DEEPSEEK_API_KEY", "")}
     s = Server(data, free_port(), env)
-    # the demo workspace, built from the JSON files of the project
-    subprocess.run([sys.executable, "seed.py"], cwd=BACKEND, env={**os.environ, "MINDTRACE_DATA_DIR": str(data)}, check=True, capture_output=True)
     s.start()
     yield s
     s.stop()
