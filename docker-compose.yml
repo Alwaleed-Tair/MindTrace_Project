@@ -1,5 +1,4 @@
 # docker compose up --build        -> the whole app (UI + API) on http://localhost:8000, data in the "mindtrace-data" volume
-# First time only, to get the demo workspace:   docker compose run --rm app python seed.py
 services:
   app:
     build:

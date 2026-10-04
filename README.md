@@ -9,10 +9,10 @@
 | المجلد | وش فيه |
 |---|---|
 | `frontend/` | الواجهة (React + Vite + Tailwind)، مقسّمة لمكونات، متصلة بالـ API |
-| `backend/` | الخادم: حسابات، تجارب، نوتس، تعاون، إشعارات، DeepSeek، استقبال `session.json`، seed |
+| `backend/` | الخادم: حسابات، تجارب، نوتس، فرق، إشعارات، DeepSeek، استقبال `session.json` |
 | `bridge/` | يرفع مجلد جلسات اللابتوب للمنصة |
 | `e2e/` | اختبارات متصفح حقيقي (Playwright) على الخادم الحقيقي |
-| `docs/` | `API_CONTRACT.md` (كل الـ endpoints) و`architecture.md` |
+| `docs/` | `REQUIREMENTS.md` (متطلبات النظام) و`API_CONTRACT.md` (كل الـ endpoints) و`architecture.md` |
 
 ## المتطلبات
 Git، **Python 3.11+**، **Node.js 20+** (من nodejs.org، يشمل npm). لا يحتاج PostgreSQL: القاعدة SQLite وتنشأ لحالها.
@@ -21,13 +21,11 @@ Git، **Python 3.11+**، **Node.js 20+** (من nodejs.org، يشمل npm). لا 
 ```powershell
 git clone https://github.com/Alwaleed-Tair/MindTrace_Project
 cd MindTrace_Project
-git checkout claude/platform-link        # لين ندمج الفرع في main
 
 # 1) الخادم
 cd backend
 pip install -r requirements.txt
 copy ..\.env.example .env                # افتح الملف وحط DEEPSEEK_API_KEY (اختياري)
-python seed.py                           # بيانات تجريبية من ملفات JSON
 
 # 2) الواجهة (مرة وحدة، تبني frontend/dist)
 cd ..\frontend
@@ -38,7 +36,7 @@ npm run build
 cd ..\backend
 python -m uvicorn main:app --port 8000
 ```
-افتح **http://localhost:8000** ← اضغط **Open demo workspace**، أو سجّل بـ `demo@mindtrace.app` وكلمة المرور `MindTrace-Demo-2026` (للتجربة المحلية فقط)، أو أنشئ حسابك.
+افتح **http://localhost:8000** وأنشئ حسابك (الاسم والبريد وكلمة مرور من 8 أحرف). كل البيانات تبدأ فاضية: أنشئ تجربة، أو ارفع جلسة من الجهاز عبر الجسر.
 
 > لو ظهر لك `uvicorn is not recognized` (يصير مع بايثون من Microsoft Store لأن مجلد Scripts مو في PATH) استخدم `python -m uvicorn` كما فوق، فهو يشتغل دائماً.
 
@@ -91,7 +89,7 @@ python -m pytest -q e2e                                            # متصفح 
 ```
 
 ## Docker (غير مجرَّب)
-`docker compose up --build` ثم `docker compose run --rm app python seed.py` ← **http://localhost:8000**. ما اختُبر هنا لأن البيئة بدون Docker.
+`docker compose up --build` ← **http://localhost:8000**. ما اختُبر هنا لأن البيئة بدون Docker.
 
 ## ملاحظات
 - الصوت الأصلي دايماً محفوظ، و`needs_review` وقراءة Whisper الثانية **تلميحات** مو دليل.
