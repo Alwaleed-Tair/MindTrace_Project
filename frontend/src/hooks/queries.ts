@@ -14,10 +14,6 @@ export function useExperiment(id: string) {
   return useQuery({ queryKey: ['experiment', id], queryFn: () => api.getExperiment(id), retry });
 }
 
-export function useNotes(params: Parameters<typeof api.listNotes>[0]) {
-  return useQuery({ queryKey: ['notes', params], queryFn: () => api.listNotes(params), retry, placeholderData: (prev) => prev });
-}
-
 export function useStats() {
   return useQuery({ queryKey: ['stats'], queryFn: api.stats, retry });
 }
@@ -78,7 +74,6 @@ export function useAddNote(id: string) {
       void qc.invalidateQueries({ queryKey: ['experiment', id] });
       void qc.invalidateQueries({ queryKey: ['experiments'] });
       void qc.invalidateQueries({ queryKey: ['stats'] });
-      void qc.invalidateQueries({ queryKey: ['notes'] });
     },
   });
 }
@@ -185,7 +180,6 @@ function useTeamMutation<V>(fn: (v: V) => Promise<unknown>) {
       void qc.invalidateQueries({ queryKey: ['experiments'] });
       void qc.invalidateQueries({ queryKey: ['experiment'] });
       void qc.invalidateQueries({ queryKey: ['stats'] });
-      void qc.invalidateQueries({ queryKey: ['notes'] });
     },
   });
 }
