@@ -213,6 +213,11 @@ def main(argv=None) -> int:
         try:
             with httpx.Client() as c:
                 setup_token(c, a.url, email, password)
+        except httpx.ConnectError:
+            print(f"Setup failed: the platform is not running at {a.url}.\n"
+                  f"Start it first in another window:  cd backend  then  python -m uvicorn main:app --port 8000\n"
+                  f"then run  python mindtrace_bridge.py --setup  again.", file=sys.stderr)
+            return 1
         except (httpx.HTTPError, RuntimeError) as exc:
             print(f"Setup failed: {exc}", file=sys.stderr)
             return 1
