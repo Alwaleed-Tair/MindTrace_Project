@@ -10,7 +10,7 @@ const DOT: Record<Tone, string> = { live: 'bg-emerald-400', rec: 'bg-red-500 rec
 function Bars({ levels, tone }: { levels: number[]; tone: Tone }) {
   const shown = levels.slice(-24);
   return (
-    <div className="mt-3 flex h-7 items-end gap-[3px]" aria-hidden="true" data-testid="device-levels">
+    <div className="mt-3 flex h-7 items-end gap-[3px]" dir="ltr" aria-hidden="true" data-testid="device-levels">
       {Array.from({ length: 24 }, (_, i) => {
         const v = shown[i - (24 - shown.length)];
         const h = v === undefined ? 0.08 : Math.max(0.08, Math.min(1, (v + 70) / 50));

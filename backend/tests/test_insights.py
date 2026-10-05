@@ -19,7 +19,7 @@ def good(**over):
             "novelty": {"score": 33, "rationale": "قياس معتاد", "caveat": "تقدير بدون بحث في الأدبيات"},
             "note_suggestions": [{"note_id": 1, "suggested_text": "قسنا الـ temperature بعد الظهر", "reason": "قراءة Whisper", "confidence": "medium"},
                                  {"note_id": 99999, "suggested_text": "ghost", "reason": "no such note"}],
-            "notes_to_review": [1, 99999], "note_kinds": [{"note_id": 1, "kind": "hypothesis"}, {"note_id": 99999, "kind": "decision"}]}
+            "notes_to_review": [1, 99999], "note_kinds": [{"note_id": 1, "kind": "decision"}, {"note_id": 2, "kind": "hypothesis"}, {"note_id": 99999, "kind": "decision"}]}
     base.update(over)
     return base
 
@@ -50,7 +50,7 @@ def test_session_ingest_runs_deepseek_and_stores_suggestions_only(tmp_path):
     assert exp["originality"] == 33                                           # the model's novelty estimate
     assert first["text"] == sample()["notes"][1]["text"]                      # the AI never rewrites a note
     kinds = {n["id"]: n["kind"] for n in exp["notes"]}
-    assert kinds[1] == "hypothesis" and kinds[2] == "observation"             # only the label the model chose for note 1 changed
+    assert kinds[1] == "decision" and kinds[2] == "observation"               # the model labelled note 1; a "hypothesis" label is ignored
     assert seen["auth"] == "Bearer sk-test-secret" and seen["url"] == "https://api.deepseek.com/chat/completions"
     assert seen["body"]["response_format"] == {"type": "json_object"}
     sent = json.dumps(seen["body"], ensure_ascii=False)

@@ -79,8 +79,8 @@
  "created_at":"...","updated_at":"...","role":"owner|editor","owner":{"id":"MT-...","name":"...","lab":"...","initials":"NR"},
  "collaborators":[{"id":"MT-...","name":"...","initials":"LH"}],"note_count":2,"session_id":null,"ai_status":"none",
  "team":{"id":"1","name":"Materials lab"},
- "trace":[{"at":"...","kind":"observation","time_label":"01:12"}],"kind_counts":{"observation":5,"hypothesis":1,"decision":0},
- "notes":[{"id":5,"text":"...","kind":"observation|hypothesis|decision","source":"manual|recording","text_source":"human|asr",
+ "trace":[{"at":"...","kind":"observation","time_label":"01:12"}],"kind_counts":{"observation":5,"decision":1},
+ "notes":[{"id":5,"text":"...","kind":"observation|decision","source":"manual|recording","text_source":"human|asr",
            "time_label":"01:12","created_at":"...","author":{},"has_audio":true,"can_edit":true,
            "asr":{"language":"Arabic","confidence":0.63,"needs_review":true,"alternative":{"engine":"faster-whisper","model":"turbo","text":"..."}}}]}
 ```
@@ -95,7 +95,7 @@
 {"summary":"ملخص كامل للتجربة (6-10 جمل من الوصف والنوتس)","key_points":["..."],"next_steps":["..."],"documentation_quality":{"score":45,"strengths":["..."],"gaps":["..."]},
  "novelty":{"score":30,"rationale":"...","caveat":"تقدير من النموذج بدون بحث في الأدبيات"},
  "note_suggestions":[{"note_id":3,"suggested_text":"...","reason":"...","confidence":"medium"}],
- "notes_to_review":[3],"note_kinds":[{"note_id":3,"kind":"hypothesis"}],"meta":{"model":"deepseek-chat","attempts":1}}
+ "notes_to_review":[3],"note_kinds":[{"note_id":3,"kind":"decision"}],"meta":{"model":"deepseek-chat","attempts":1}}
 ```
 - **اقتراحات فقط**: نص أي نوت ما يتغيّر إلا لو قبل الباحث (زر "Use this text"). المتغيّر تلقائياً شيئين: تصنيف النوت المسجّل (`kind`) والرقم `originality` من تقدير النموذج.
 - النموذج أحياناً يرجع JSON ناقص (شفناه فعلاً مع DeepSeek): الخادم يعيد الطلب حتى 3 مرات قبل ما يعلن الفشل.

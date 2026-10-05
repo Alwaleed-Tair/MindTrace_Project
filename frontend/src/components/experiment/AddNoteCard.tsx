@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api';
 import { kindColor } from '@/components/common/Trace';
 import type { NoteKind } from '@/lib/types';
 
-const KINDS: NoteKind[] = ['observation', 'hypothesis', 'decision'];
+const KINDS: NoteKind[] = ['observation', 'decision'];
 
 export const NOTE_TEXTAREA_ID = 'new-note-text';
 
@@ -23,7 +23,7 @@ export function AddNoteCard({ experimentId, text, onText, dictation }: Props) {
   const { t } = usePreferences();
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<NoteKind>('observation');
-  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, hypothesis: t.kindHypothesis, decision: t.kindDecision };
+  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, decision: t.kindDecision };
   const add = useAddNote(experimentId);
   const save = () => {
     const value = text.trim();

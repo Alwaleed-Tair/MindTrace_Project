@@ -74,7 +74,7 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignored
   const [only, setOnly] = useState<NoteKind | 'all'>('all');
   const filtered = only === 'all' ? notes : notes.filter((n) => n.kind === only);
   const shown = limit ? filtered.slice(-limit) : filtered;
-  const kinds: (NoteKind | 'all')[] = ['all', 'observation', 'hypothesis', 'decision'];
+  const kinds: (NoteKind | 'all')[] = ['all', 'observation', 'decision'];
   const count = (k: NoteKind | 'all') => (k === 'all' ? notes.length : notes.filter((n) => n.kind === k).length);
   return (
     <section className="surface p-5 sm:p-6" data-testid="card-notes">
@@ -113,7 +113,7 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignored
               <div className="min-w-0 flex-1 pt-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-[10px] text-muted-foreground">{note.time_label ?? clockTime(note.created_at, language)}</span>
-                  <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ color: kindColor(note.kind), background: `hsl(var(--kind-${note.kind === 'hypothesis' ? 'hyp' : note.kind === 'decision' ? 'dec' : 'obs'}-soft))` }} data-kind={note.kind} data-testid={`note-kind-${note.id}`}>{kindLabel(note.kind, t)}</span>
+                  <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ color: kindColor(note.kind), background: `hsl(var(--kind-${note.kind === 'decision' ? 'dec' : 'obs'}-soft))` }} data-kind={note.kind} data-testid={`note-kind-${note.id}`}>{kindLabel(note.kind, t)}</span>
                   {note.source === 'recording' && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><AudioLines size={10} />{t.fromRecording}</span>}
                   {shouldReview(note) && <span className="inline-flex items-center gap-1 rounded-full bg-kind-dec-soft px-2 py-0.5 text-[10px] font-semibold text-kind-dec" data-testid={`note-review-${note.id}`}><Eye size={10} />{t.needsReview}</span>}
                   {ignoredIds?.includes(note.id) && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground" data-testid={`note-ignored-${note.id}`}>{t.ignoredByAi}</span>}

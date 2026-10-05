@@ -76,8 +76,9 @@ def test_users_cannot_see_or_touch_each_others_data(app):
 def test_notes_crud_and_validation(app):
     c = new_client(app, "n@x.com")
     e = make_exp(c)
-    n = c.post(f"/api/experiments/{e['id']}/notes", json={"text": "  At 23.4°C the colour changed.  ", "kind": "hypothesis"})
-    assert n.status_code == 201 and n.json()["text"] == "At 23.4°C the colour changed." and n.json()["kind"] == "hypothesis"
+    n = c.post(f"/api/experiments/{e['id']}/notes", json={"text": "  At 23.4°C the colour changed.  ", "kind": "decision"})
+    assert n.status_code == 201 and n.json()["text"] == "At 23.4°C the colour changed." and n.json()["kind"] == "decision"
+    assert c.post(f"/api/experiments/{e['id']}/notes", json={"text": "a guess", "kind": "hypothesis"}).status_code == 422   # kind removed
     nid = n.json()["id"]
     assert c.patch(f"/api/notes/{nid}", json={"text": "edited", "kind": "decision"}).json()["kind"] == "decision"
     assert c.get(f"/api/experiments/{e['id']}").json()["notes"][0]["text"] == "edited"
@@ -130,9 +131,28 @@ def test_list_includes_the_note_trace_and_kind_counts(tmp_path):
     from helpers import make_app, make_exp, new_client
     c = new_client(make_app(tmp_path), "trace@x.com")
     e = make_exp(c)
-    for text, kind in [("seen", "observation"), ("maybe", "hypothesis"), ("do it", "decision"), ("again", "observation")]:
+    for text, kind in [("seen", "observation"), ("maybe", "observation"), ("do it", "decision"), ("again", "observation")]:
         assert c.post(f"/api/experiments/{e['id']}/notes", json={"text": text, "kind": kind}).status_code == 201
     item = c.get("/api/experiments").json()["items"][0]
-    assert [m["kind"] for m in item["trace"]] == ["observation", "hypothesis", "decision", "observation"]
+    assert [m["kind"] for m in item["trace"]] == ["observation", "observation", "decision", "observation"]
     assert all(m["at"] for m in item["trace"])
-    assert item["kind_counts"] == {"observation": 2, "hypothesis": 1, "decision": 1}
+    assert item["kind_counts"] == {"observation": 3, "decision": 1}
+
+
+def test_old_hypothesis_notes_become_observations_on_start(tmp_path):
+    """The hypothesis kind was removed: a database from before still opens, and its hypotheses read as observations."""
+    from core.db import Database
+    from helpers import make_app, make_exp, new_client
+    app = make_app(tmp_path)
+    c = new_client(app, "old@x.com")
+    e = make_exp(c)
+    nid = c.post(f"/api/experiments/{e['id']}/notes", json={"text": "an old guess"}).json()["id"]
+    db_path = tmp_path / "data" / "mindtrace.sqlite3"
+    Database(db_path).run("UPDATE notes SET kind='hypothesis' WHERE id=?", (nid,))       # what an older version saved
+    Database(db_path)                                                                       # the next start migrates it
+    app2 = make_app(tmp_path)
+    c2 = new_client(app2, register=False)
+    c2.post("/api/auth/login", json={"email": "old@x.com", "password": "correct-horse-1", "remember": True})
+    notes = c2.get(f"/api/experiments/{e['id']}").json()["notes"]
+    assert [n["kind"] for n in notes] == ["observation"]
+    assert c2.patch(f"/api/notes/{nid}", json={"kind": "hypothesis"}).status_code == 422

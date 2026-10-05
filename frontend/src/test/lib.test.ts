@@ -40,3 +40,12 @@ describe('notification text', () => {
     expect(notificationText(note({ kind: 'status_changed', actor: lina }), translations.ar)).toContain('Dr. Lina Haddad');
   });
 });
+
+import { greetingName as gn } from '@/lib/format';
+describe('greeting name keeps the title with the first name', () => {
+  it('English and Arabic titles', () => {
+    expect(gn('Dr. Noor Rahman')).toBe('Dr. Noor');
+    expect(gn('د. وليد الطير')).toBe('د. وليد');
+    expect(gn('وليد الطير')).toBe('وليد');
+  });
+});

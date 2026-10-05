@@ -154,6 +154,8 @@ class Database:
                 cols = {r["name"] for r in self._conn.execute(f"PRAGMA table_info({table})")}
                 if column not in cols:
                     self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            # the "hypothesis" note kind was removed: notes saved with it before become plain observations
+            self._conn.execute("UPDATE notes SET kind='observation' WHERE kind='hypothesis'")
 
     @contextmanager
     def tx(self):

@@ -182,28 +182,29 @@ describe('the trace', () => {
   const at = (min: number) => new Date(Date.now() - (60 - min) * 60_000).toISOString();
   it('cards draw one dot per note and count the kinds; originality shows only after an analysis', async () => {
     signedIn([
-      exp({ id: '1', trace: [{ at: at(0), kind: 'observation', time_label: null }, { at: at(30), kind: 'hypothesis', time_label: null }], kind_counts: { observation: 1, hypothesis: 1, decision: 0 } }),
+      exp({ id: '1', trace: [{ at: at(0), kind: 'observation', time_label: null }, { at: at(30), kind: 'decision', time_label: null }], kind_counts: { observation: 1, decision: 1 } }),
       exp({ id: '2', title: 'Second', code: 'EXP-2', ai_status: 'done', originality: 71 }),
     ]);
     renderApp();
     await screen.findByTestId('experiments-grid');
     expect(screen.getByTestId('trace-1')).toHaveAttribute('data-points', '2');
     expect(screen.getByTestId('kinds-1')).toHaveTextContent('1Observation');
-    expect(screen.getByTestId('kinds-1')).toHaveTextContent('1Hypothesis');
+    expect(screen.getByTestId('kinds-1')).toHaveTextContent('1Decision');
+    expect(screen.getByTestId('kinds-1')).not.toHaveTextContent(/Hypothes/);
     expect(screen.getByTestId('originality-1')).toHaveTextContent('Not analyzed');
     expect(screen.getByTestId('originality-2')).toHaveTextContent('71');
   });
 
   it('the experiment page trace jumps to a note', async () => {
     signedIn();
-    const n = (id: number, kind: 'observation' | 'hypothesis' | 'decision', min: number, text: string) => ({ id, text, kind, source: 'manual' as const, text_source: 'human' as const, time_label: null, created_at: at(min), updated_at: at(min), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true });
-    A.getExperiment.mockResolvedValue(exp({ notes: [n(1, 'observation', 0, 'colour turned amber'), n(2, 'hypothesis', 20, 'airflow cools the sample'), n(3, 'decision', 40, 'repeat at 26 degrees')] }));
+    const n = (id: number, kind: 'observation' | 'decision', min: number, text: string) => ({ id, text, kind, source: 'manual' as const, text_source: 'human' as const, time_label: null, created_at: at(min), updated_at: at(min), author: noor, asr: null, audio_file: null, has_audio: false, can_edit: true });
+    A.getExperiment.mockResolvedValue(exp({ notes: [n(1, 'observation', 0, 'colour turned amber'), n(2, 'observation', 20, 'airflow cools the sample'), n(3, 'decision', 40, 'repeat at 26 degrees')] }));
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
     renderApp('/experiments/1');
     await screen.findByTestId('session-trace');
-    expect(screen.getByTestId('trace-kinds')).toHaveTextContent('1 observations · 1 hypotheses · 1 decisions');
-    expect(screen.getByTestId('note-kind-2')).toHaveTextContent('Hypothesis');
+    expect(screen.getByTestId('trace-kinds')).toHaveTextContent('2 observations · 1 decisions');
+    expect(screen.getByTestId('note-kind-3')).toHaveTextContent('Decision');
     await userEvent.click(screen.getByTestId('trace-mark-3'));
     await waitFor(() => expect(scroll).toHaveBeenCalled());
     // the kind filter keeps only one kind in the timeline
@@ -212,16 +213,30 @@ describe('the trace', () => {
     expect(screen.getByTestId('note-3')).toBeInTheDocument();
   });
 
-  it('a note can be filed as a hypothesis', async () => {
+  it('a note can be filed as a decision; there is no hypothesis kind any more', async () => {
     signedIn();
     A.getExperiment.mockResolvedValue(exp());
     A.addNote.mockResolvedValue({});
     renderApp('/experiments/1');
     const box = await screen.findByTestId('textarea-new-note');
-    await userEvent.click(screen.getByTestId('note-kind-hypothesis'));
-    fireEvent.change(box, { target: { value: 'humidity matters' } });
+    expect(screen.queryByTestId('note-kind-hypothesis')).toBeNull();
+    expect(screen.queryByTestId('filter-kind-hypothesis')).toBeNull();
+    expect(screen.queryByText(/hypothes/i)).toBeNull();
+    await userEvent.click(screen.getByTestId('note-kind-decision'));
+    fireEvent.change(box, { target: { value: 'repeat at 26 degrees' } });
     await userEvent.click(screen.getByTestId('button-save-note'));
-    await waitFor(() => expect(A.addNote).toHaveBeenCalledWith('1', 'humidity matters', 'hypothesis'));
+    await waitFor(() => expect(A.addNote).toHaveBeenCalledWith('1', 'repeat at 26 degrees', 'decision'));
+  });
+
+  it('the breadcrumb shows where you are and goes back to the workspace', async () => {
+    signedIn();
+    A.getExperiment.mockResolvedValue(exp({ title: 'Ambient temperature' }));
+    renderApp('/experiments/1');
+    const crumb = await screen.findByTestId('breadcrumb');
+    expect(crumb).toHaveTextContent('Workspace');
+    expect(crumb).toHaveTextContent('Ambient temperature');
+    await userEvent.click(screen.getByTestId('button-back-dashboard'));
+    expect(await screen.findByTestId('experiments-grid')).toBeInTheDocument();
   });
 });
 

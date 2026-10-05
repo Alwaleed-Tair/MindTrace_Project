@@ -1,4 +1,4 @@
-import { ArrowLeft, AudioLines, Clock3, FileText, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, ChevronRight, AudioLines, Clock3, FileText, LayoutDashboard, Pencil, Sparkles, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { StatusPill } from '@/components/common/StatusPill';
@@ -95,10 +95,15 @@ function Detail({ experiment }: { experiment: Experiment }) {
   return (
     <div className="animate-in" data-testid="experiment-page" data-status={experiment.status}>
       <header className="ink-band -mx-1 rounded-3xl border border-sidebar-border p-5 sm:mx-0 sm:p-8" data-testid="experiment-header">
-      <button type="button" onClick={() => navigate('/dashboard')} className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground transition hover:text-primary" data-testid="button-back-dashboard">
-        <ArrowLeft size={15} className="rtl:rotate-180" />
-        {t.back}
-      </button>
+      {/* breadcrumb: where you are and one click back (the old plain link was easy to miss on the dark band) */}
+      <nav aria-label={t.breadcrumb} className="mb-6 flex min-w-0 items-center gap-2 text-xs" data-testid="breadcrumb">
+        <button type="button" onClick={() => navigate('/dashboard')} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 font-semibold text-white/85 transition hover:border-sidebar-accent/60 hover:bg-white/10 hover:text-white" data-testid="button-back-dashboard">
+          <ArrowLeft size={14} className="rtl:rotate-180" />
+          {t.dashboard}
+        </button>
+        <ChevronRight size={14} className="shrink-0 text-white/35 rtl:rotate-180" aria-hidden="true" />
+        <span className="truncate font-medium text-white/60" dir="auto" aria-current="page">{experiment.title}</span>
+      </nav>
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
@@ -164,7 +169,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 id="trace-h" className="text-sm font-semibold">{t.sessionTrace}</h2>
-            <span className="text-xs text-muted-foreground" data-testid="trace-kinds">{fill(t.kindsCount, { o: count('observation'), h: count('hypothesis'), d: count('decision') })}</span>
+            <span className="text-xs text-muted-foreground" data-testid="trace-kinds">{fill(t.kindsCount, { o: count('observation'), d: count('decision') })}</span>
           </div>
           {notes.length > 0 && <span className="text-[11px] text-muted-foreground">{t.traceHint}</span>}
         </div>

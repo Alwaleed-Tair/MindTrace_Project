@@ -24,7 +24,7 @@ def iso(dt: datetime | None = None) -> str:
 
 
 def initials(name: str) -> str:
-    words = [w for w in re.split(r"\s+", re.sub(r"^(dr|prof)\.?\s+", "", name.strip(), flags=re.IGNORECASE)) if w]
+    words = [w for w in re.split(r"\s+", re.sub(r"^(dr|prof|د|أ\.?د|م)\.?\s+", "", name.strip(), flags=re.IGNORECASE)) if w]   # skip Dr. / د.
     return "".join(w[0] for w in words[:2]).upper() or "?"
 
 

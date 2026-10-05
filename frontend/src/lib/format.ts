@@ -34,5 +34,5 @@ export function fill(template: string, values: Record<string, string | number>):
 export function greetingName(full: string): string {
   const parts = full.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '';
-  return /^(dr|prof)\.?$/i.test(parts[0]) && parts.length > 1 ? `${parts[0]} ${parts[1]}` : parts[0];
+  return /^(dr|prof|د|أ\.?د|م)\.?$/i.test(parts[0]) && parts.length > 1 ? `${parts[0]} ${parts[1]}` : parts[0];   // Dr. Noor / د. وليد
 }

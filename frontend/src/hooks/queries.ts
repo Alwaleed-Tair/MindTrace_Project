@@ -68,7 +68,7 @@ export function useSetStatus() {
 export function useAddNote(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    // a plain string is an observation; pass { text, kind } to file a hypothesis or a decision
+    // a plain string is an observation; pass { text, kind } to file a decision
     mutationFn: (v: string | { text: string; kind: NoteKind }) => (typeof v === 'string' || v.kind === 'observation' ? api.addNote(id, typeof v === 'string' ? v : v.text) : api.addNote(id, v.text, v.kind)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['experiment', id] });

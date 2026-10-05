@@ -120,3 +120,10 @@ def test_unauthenticated_requests_are_refused_everywhere(app):
         assert getattr(c, method)(path).status_code == 401, (method, path)
     assert c.get("/api/health").status_code == 200
     assert c.get("/api/nope").status_code == 404 and c.get("/api/nope").json()["detail"]
+
+
+def test_initials_skip_titles():
+    from services.users import initials
+    assert initials("Dr. Noor Rahman") == "NR"
+    assert initials("د. وليد الطير") == "وا"
+    assert initials("محمد") == "م"

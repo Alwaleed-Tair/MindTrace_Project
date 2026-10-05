@@ -11,7 +11,7 @@ import { usePreferences } from '@/context/PreferencesContext';
 import { fill, relativeTime } from '@/lib/format';
 import type { Experiment, NoteKind, Status } from '@/lib/types';
 
-const KINDS: NoteKind[] = ['observation', 'hypothesis', 'decision'];
+const KINDS: NoteKind[] = ['observation', 'decision'];
 
 const stateClass: Record<Status, string> = {
   Active: '',
@@ -30,7 +30,7 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
   const points = marks.map((m, i) => ({ pos: pos[i], kind: m.kind }));
   const counts = e.kind_counts;
   const analyzed = e.ai_status === 'done';
-  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, hypothesis: t.kindHypothesis, decision: t.kindDecision };
+  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, decision: t.kindDecision };
 
   return (
     <article className={`group surface p-5 transition duration-200 hover:border-primary/40 ${stateClass[e.status]}`} data-testid={`card-experiment-${e.id}`} data-status={e.status}>
@@ -42,8 +42,8 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
             {e.team && <span className="inline-flex items-center gap-1 rounded-full bg-kind-hyp-soft px-2 py-0.5 text-[10px] font-semibold text-kind-hyp" data-testid={`team-chip-${e.id}`}><Users size={10} />{e.team.name}</span>}
             {e.role === 'editor' && !e.team && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{fill(t.sharedBy, { name: e.owner.name })}</span>}
           </div>
-          <h3 className="mt-3 line-clamp-1 text-[17px] font-semibold tracking-[-.03em]">{e.title}</h3>
-          <p className="mt-2 line-clamp-2 min-h-[40px] text-xs leading-5 text-muted-foreground">{e.summary}</p>
+          <h3 className="mt-3 line-clamp-1 text-[17px] font-semibold tracking-[-.03em]" dir="auto">{e.title}</h3>
+          <p className="mt-2 line-clamp-2 min-h-[40px] text-xs leading-5 text-muted-foreground" dir="auto">{e.summary}</p>
         </div>
         <div className="mt-4">
           <TraceLine points={points} testId={`trace-${e.id}`} />

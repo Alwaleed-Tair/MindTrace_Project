@@ -176,6 +176,7 @@ const en = {
   cancel: 'Cancel',
   // experiment page
   back: 'Back to workspace',
+  breadcrumb: 'You are here',
   overview: 'Overview',
   notes: 'Notes',
   insights: 'Insights',
@@ -273,7 +274,6 @@ const en = {
   reportGenerated: 'Generated with MindTrace',
   reportPage: 'Page {n} of {total}',
   kindObservation: 'Observation',
-  kindHypothesis: 'Hypothesis',
   kindDecision: 'Decision',
   // account and editing
   forgotPassword: 'Forgot password?',
@@ -384,7 +384,7 @@ const en = {
   sessionTraceSub: '{n} notes across {time}',
   traceHint: 'Each dot is a note at its moment. Click one to jump to it.',
   noteKind: 'Note type',
-  kindsCount: '{o} observations · {h} hypotheses · {d} decisions',
+  kindsCount: '{o} observations · {d} decisions',
   startedOn: 'Started {date}',
 } as const;
 
@@ -557,6 +557,7 @@ const ar: Strings = {
   create: 'إنشاء التجربة',
   cancel: 'إلغاء',
   back: 'العودة إلى مساحة العمل',
+  breadcrumb: 'موقعك في الموقع',
   overview: 'نظرة عامة',
   notes: 'ملاحظات',
   insights: 'رؤى',
@@ -652,7 +653,6 @@ const ar: Strings = {
   reportGenerated: 'أُنشئ باستخدام MindTrace',
   reportPage: 'صفحة {n} من {total}',
   kindObservation: 'ملاحظة',
-  kindHypothesis: 'فرضية',
   kindDecision: 'قرار',
   // account and editing
   forgotPassword: 'نسيت كلمة المرور؟',
@@ -763,7 +763,7 @@ const ar: Strings = {
   sessionTraceSub: '{n} ملاحظات خلال {time}',
   traceHint: 'كل نقطة ملاحظة في لحظتها. اضغط عليها للانتقال لها.',
   noteKind: 'نوع الملاحظة',
-  kindsCount: '{o} ملاحظات · {h} فرضيات · {d} قرارات',
+  kindsCount: '{o} ملاحظات · {d} قرارات',
   startedOn: 'بدأت {date}',
 };
 

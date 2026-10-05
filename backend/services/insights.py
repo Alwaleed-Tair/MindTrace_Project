@@ -1,6 +1,6 @@
 """AI insights for an experiment (DeepSeek): summary, documentation quality, originality estimate, note suggestions.
 
-The model only SUGGESTS. The one thing applied automatically is the kind label (observation / hypothesis / decision)
+The model only SUGGESTS. The one thing applied automatically is the kind label (observation / decision)
 of notes that came from a recording, and the originality number; the text of a note is never changed by the AI.
 """
 from __future__ import annotations
