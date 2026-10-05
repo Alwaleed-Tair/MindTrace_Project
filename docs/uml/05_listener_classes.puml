@@ -1,0 +1,92 @@
+@startuml
+!include _style.iuml
+title Laptop listener (MindTrace2/pc) - Class Diagram
+hide empty members
+
+class MindTraceApp {
+  session : Session
+  run() : int
+  handle(item)
+  on_event(name, fields)
+  on_hello() on_heartbeat()
+  on_start() on_stop() on_audio(payload)
+  start_session(tag, joined_late)
+  save_note(s, start, end, beep)
+  finish_session(s, reason)
+  complete_session(s)
+  write_live()  .live.json every 2 s
+  shutdown()
+}
+class DeviceLink {
+  probe_port() open_serial()
+  send(line)
+}
+class "protocol" as protocol <<module>> {
+  SYNC = AA 55
+  T_AUDIO / T_EVENT / T_LOG
+  build_frame() parse_audio() parse_event()
+  line_start_ack() line_note() line_text() line_saved()
+}
+class Segmenter {
+  state : idle | speech
+  noise floor (10th pct, 8 s)
+  START +9 dB / KEEP +5 dB
+  END_SILENCE 1.3 s, NO_SPEECH_END 3 s
+  MIN_NOTE 0.6 s, MAX_NOTE 60 s
+  process(samples) : list<SegEvent>
+  advance_silence() flush()
+}
+class SegEvent
+class Session {
+  dir : sessions/<date_time>/
+  tag, notes[]
+  audio : GrowBuffer
+  segmenter : Segmenter
+  wav : StreamingWav
+  add_audio(seq, samples) : list<SegEvent>
+  add_note(start, end)
+  set_transcript() set_speaker_check()
+  finish(reason) mark_complete()
+  to_dict()  -> session.json
+}
+class GrowBuffer
+class Transcriber {
+  faster-whisper (worker thread)
+  submit(Job) stop() ready()
+  transcribe(audio) : (text, status)
+}
+class AudarTranscriber
+class DisabledTranscriber {
+  submit(Job) stop()
+  (same interface, no model)
+}
+class FakeWhisperModel <<tests>>
+class Job
+class SpeakerWorker
+class SessionSpeaker
+class SpeakerChecker
+class SpeakerModel <<ONNX>>
+class StreamingWav
+class DiskReporter
+class Console
+
+MindTraceApp *-- DeviceLink
+MindTraceApp ..> protocol
+MindTraceApp o-- Session
+MindTraceApp *-- Transcriber
+MindTraceApp *-- "0..1" SpeakerWorker
+MindTraceApp --> Console
+MindTraceApp --> DiskReporter
+Segmenter ..> SegEvent : emits
+Session *-- GrowBuffer
+Session *-- Segmenter
+Session *-- StreamingWav : full_session.wav
+Transcriber <|-- AudarTranscriber
+MindTraceApp ..> DisabledTranscriber : --no-transcribe
+Transcriber ..> Job
+Transcriber ..> FakeWhisperModel
+SpeakerWorker --> SessionSpeaker
+SessionSpeaker --> SpeakerChecker
+SpeakerChecker --> SpeakerModel
+DeviceLink ..> protocol
+@enduml

@@ -1,0 +1,65 @@
+@startuml
+!include _style.iuml
+title Sequence - one recording, from the device button to the platform
+autonumber
+actor Researcher as R
+participant "ESP32 device\n(loop + linkTask)" as D
+participant "MindTraceApp\n(listener)" as A
+participant "Session +\nSegmenter" as S
+participant "Transcriber\n(worker thread)" as T
+collections "sessions/<date>/" as F
+participant "mindtrace_bridge\n--watch" as B
+participant "FastAPI\n/api/sessions" as API
+participant "services.sessions\n.upsert" as UP
+database SQLite as DB
+participant "insights.run\n(background)" as IN
+participant "DeepSeek +\nscholarly APIs" as EXT
+
+D -> A : EVENT HELLO fw=2.0.0 ...
+A -> D : HELLO <app_version>, GAIN <x>
+loop every 1 s
+  D -> A : EVENT HB ...
+end
+R -> D : short press (link UP)
+D -> A : EVENT START tag=xxxx
+A -> F : new folder, full_session.wav (streaming)
+A -> D : START_ACK <tag>
+loop audio
+  D -> A : AUDIO tag, seq, 512 x int16 @16 kHz
+  A -> S : add_audio(seq, samples)
+  S --> A : SegEvent (speech start / end)
+  A -> D : VAD 1 / VAD 0
+end
+note over S : first note = title\nnote ends after 1.3 s pause\n(or 3 s with no speech peak)
+A -> F : notes/note_NN.wav
+A -> D : NOTE <id> <T|N> <start> <dur>
+A -> T : submit(Job)
+T --> A : text (Audar / Whisper)
+A -> D : TEXT <id> <words> <T|N>
+R -> D : short press
+D -> A : EVENT STOP tag reason=button
+A -> D : STOP_ACK <tag>
+A -> A : finish_session -> wait for transcripts
+A -> F : session.json (status=complete), report.html
+A -> D : SAVED <notes> <dur_s>
+
+== upload (bridge scans every --interval, default 20 s) ==
+B -> F : find_sessions(): status == complete,\nsha256 changed?
+B -> API : POST /api/sessions (multipart)\nAuthorization: Bearer mt_...\nsession + files[notes/*.wav, full_session.wav]
+API -> API : current_user(token), size limit,\nSessionIn validation
+API -> API : storage.save_audio() ->\nserver data/audio/u<owner>/<session_id>/\n(whitelisted names)
+API -> UP : upsert(raw, s, audio_files)
+UP -> DB : find experiment by session / same spoken title\nor create (experiment_title)
+UP -> DB : INSERT/UPDATE sessions (session_json verbatim)
+UP -> DB : _sync_notes(): one note per spoken note\n(person edits never overwritten)
+UP -> DB : notify_members("note_added")
+API --> B : 201 {experiment_id, notes, audio_files, ai_status}
+alt AI key set and AI auto on
+  API -> IN : BackgroundTasks.add_task(run)
+  IN -> DB : ai_status = running
+  IN -> EXT : analyze(notes) -> summary, key points,\nnext steps, suggestions, novelty
+  IN -> EXT : make_queries -> literature.search\n-> assess_originality
+  IN -> DB : ai_status = done, ai_json, originality
+end
+B -> B : save .bridge_state.json (per server+account)
+@enduml

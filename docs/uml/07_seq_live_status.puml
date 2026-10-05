@@ -1,0 +1,32 @@
+@startuml
+!include _style.iuml
+title Sequence - live "device connected" card on the platform
+autonumber
+participant "ESP32 device" as D
+participant "MindTraceApp" as A
+collections "sessions/.live.json" as L
+participant "mindtrace_bridge\n--watch" as B
+participant "POST /api/bridge/heartbeat" as HB
+database "api_tokens\n(last_seen_at, status_json)" as DB
+participant "GET /api/bridge/status" as ST
+participant "DeviceStatusCard\n(React, polls 5 s)" as UI
+
+loop every 1 s
+  D -> A : EVENT HB (link up)
+end
+loop every 2 s (LIVE_STATUS_EVERY_SEC)
+  A -> L : write_live(): device_connected,\nrecording, levels, firmware
+end
+loop every 5 s
+  B -> L : read_live()
+  B -> HB : Bearer mt_ token + status
+  HB -> DB : last_seen_at = now, status_json
+  note right : a .live.json older than 15 s\nis reported as listener off
+end
+loop every 5 s
+  UI -> ST : (cookie)
+  ST -> DB : this user's tokens
+  ST --> UI : linked, online (seen <= 30 s),\ndevice_connected, recording, levels,\nlast_upload_at, computers[]
+  UI -> UI : state live / rec / warn / off
+end
+@enduml

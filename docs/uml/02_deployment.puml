@@ -1,0 +1,67 @@
+@startuml
+!include _style.iuml
+title MindTrace - Deployment / Component Diagram (as built)
+
+node "MindTrace device\n(ESP32-S3 N16R8, firmware 2.0.0)" as DEV {
+  component "INMP441 mic\n(I2S, 16 kHz)" as MIC
+  component "ILI9341 screen\n(software SPI)" as TFT
+  component "Button (GPIO16)" as BTN
+  component "audioTask (core 0)" as AT
+  component "buttonTask (core 0)" as BT
+  component "linkTask (core 0)\nonly code touching USB" as LT
+  component "loop() UI (core 1)\nscreens IDLE/REC/SUMMARY/..." as UI
+  MIC --> AT
+  BTN --> BT
+  BT --> UI
+  AT --> LT : TX ring
+  UI --> LT : events ring
+  UI --> TFT
+}
+
+node "Researcher's laptop (Windows)" as LAP {
+  component "mindtrace_listener.py\n(MindTraceApp)" as APP
+  component "DeviceLink + protocol\n(pyserial)" as LINK
+  component "Segmenter" as SEG
+  component "Transcriber\n(Audar-ASR / faster-whisper)" as TR
+  component "SpeakerWorker\n(ONNX speaker model)" as SPK
+  folder "sessions/\n<date>/session.json\nnotes/*.wav, full_session.wav,\nreport.html, .live.json" as FS
+  component "mindtrace_bridge.py\n(httpx)" as BR
+  file ".bridge_token\n.bridge_state.json" as TOK
+  LINK --> APP
+  APP --> SEG
+  APP --> TR
+  APP --> SPK
+  APP --> FS : writes
+  BR --> FS : reads
+  BR --> TOK
+}
+
+node "Platform server (uvicorn / Docker)" as SRV {
+  component "FastAPI app (main.py)" as API
+  component "Routers: auth, experiments,\nsessions, bridge, teams, misc" as RT
+  component "Services: users, experiments,\nmentions, sessions, insights,\nai, literature, teams, storage, mailer" as SV
+  database "SQLite (WAL)\ndata/mindtrace.sqlite3" as DB
+  folder "data/audio/u<owner>/<session_id>/\nnotes/title.wav, note_NN.wav,\nfull_session.wav" as AUD
+  component "React SPA (frontend/dist)\nserved by FastAPI" as SPA
+  API --> RT
+  RT --> SV
+  SV --> DB
+  SV --> AUD
+  API --> SPA
+}
+
+node "Browser" as BRW {
+  component "React + react-query\n(i18n ar/en, Web Speech dictation)" as WEB
+}
+
+cloud "DeepSeek API" as DS
+cloud "OpenAlex / Semantic Scholar /\narXiv / Crossref" as LITC
+cloud "SMTP" as SMTP
+
+LT <--> LINK : USB CDC serial\nbinary frames (AA 55 ...) / ASCII lines
+BR --> API : HTTPS + Bearer mt_ token\nPOST /api/sessions (multipart)\nPOST /api/bridge/heartbeat every 5 s
+WEB --> API : HTTPS + session cookie\n+ X-Requested-With: mindtrace
+SV --> DS : chat completions (JSON)
+SV --> LITC : paper search
+SV --> SMTP : reset links
+@enduml

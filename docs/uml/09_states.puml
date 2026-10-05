@@ -1,0 +1,36 @@
+@startuml
+!include _style.iuml
+title State Machines (from the code)
+
+state "Device screen (firmware g_screen)" as SCR {
+  [*] --> IDLE
+  IDLE --> REC : short press [link UP]\n/ send START
+  IDLE --> MESSAGE : short press [no PC]\n"PC app not connected"
+  MESSAGE --> IDLE : press / timeout
+  REC --> SUMMARY : short press (>1 s)\n/ STOP reason=button
+  REC --> SUMMARY : link LOST / BYE\n/ STOP link_lost | pc_closed
+  SUMMARY --> SUMMARY : short press [more pages]
+  SUMMARY --> IDLE : last page / long press
+  IDLE --> DIAG : boot with button held
+  DIAG --> IDLE : long press
+  IDLE --> CALIB : orientation setup
+  CALIB --> IDLE : press / timeout
+}
+
+state "Device link (linkTask)" as LINKS {
+  [*] --> NEVER
+  NEVER --> UP : PC line received
+  UP --> SILENT : nothing for 3.5 s
+  SILENT --> UP : line received
+  SILENT --> LOST : nothing for 8 s
+  LOST --> UP : line received
+  UP --> BYE : PC sent BYE
+  BYE --> UP : line received
+}
+
+state "Segmenter (listener)" as SEGS {
+  [*] --> idle
+  idle --> speech : onset: >= 0.2 s speech-like\nin 0.32 s, +9 dB over floor
+  speech --> idle : 1.3 s pause | 3 s no speech peak |\n60 s max / emit note\n(dropped if < 0.6 s or < 0.45 s voiced)
+}
+@enduml

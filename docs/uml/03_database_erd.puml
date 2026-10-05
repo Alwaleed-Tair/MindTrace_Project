@@ -1,0 +1,147 @@
+@startuml
+!include _style.iuml
+title MindTrace - Database (SQLite) - exact schema incl. migrations
+hide circle
+skinparam linetype ortho
+
+entity users {
+  * id : INTEGER <<PK>>
+  --
+  * public_id : TEXT <<UNIQUE>> (MT-XXXXXXXX)
+  * email : TEXT <<UNIQUE, NOCASE>>
+  * name : TEXT
+  lab : TEXT
+  * password_hash : TEXT
+  * created_at : TEXT
+}
+entity auth_sessions {
+  * token_hash : TEXT <<PK>>
+  --
+  * user_id : INTEGER <<FK users>>
+  * created_at : TEXT
+  * expires_at : TEXT
+}
+entity api_tokens {
+  * id : INTEGER <<PK>>
+  --
+  * token_hash : TEXT <<UNIQUE>>
+  * user_id : INTEGER <<FK users>>
+  label : TEXT
+  * created_at : TEXT
+  last_used_at : TEXT
+  last_seen_at : TEXT (heartbeat)
+  status_json : TEXT (device status)
+}
+entity password_resets {
+  * token_hash : TEXT <<PK>>
+  --
+  * user_id : INTEGER <<FK users>>
+  * created_at : TEXT
+  * expires_at : TEXT
+  used_at : TEXT
+}
+entity experiments {
+  * id : INTEGER <<PK>>
+  --
+  * owner_id : INTEGER <<FK users>>
+  team_id : INTEGER <<FK teams>>
+  * code : TEXT
+  * title : TEXT (max 160)
+  summary : TEXT
+  * status : Active | Paused | Completed
+  duration_sec : REAL
+  originality : INTEGER 0..100
+  tags : TEXT (JSON)
+  color : TEXT
+  session_id : TEXT
+  * ai_status : none|disabled|queued|running|done|failed
+  ai_json : TEXT
+  ai_error : TEXT
+  ai_updated_at : TEXT
+  * created_at / updated_at : TEXT
+}
+entity notes {
+  * id : INTEGER <<PK>>
+  --
+  * experiment_id : INTEGER <<FK experiments>>
+  * author_id : INTEGER <<FK users>>
+  * text : TEXT (max 5000, may hold @{MT-...})
+  * kind : 'observation'
+  * source : manual | recording
+  * text_source : human | asr
+  time_label : TEXT
+  meta : TEXT (JSON: session_id, session_note_id,\naudio_file, asr, speaker_check)
+  * created_at / updated_at : TEXT
+}
+entity collaborators {
+  * experiment_id : INTEGER <<PK, FK experiments>>
+  * user_id : INTEGER <<PK, FK users>>
+  --
+  * added_by : INTEGER <<FK users>>
+  * created_at : TEXT
+}
+entity notifications {
+  * id : INTEGER <<PK>>
+  --
+  * user_id : INTEGER <<FK users>> (recipient)
+  actor_id : INTEGER <<FK users>>
+  experiment_id : INTEGER <<FK experiments>>
+  note_id : INTEGER
+  * kind : TEXT (7 kinds, see note)
+  * message : TEXT
+  * created_at : TEXT
+  read_at : TEXT
+}
+entity sessions {
+  * owner_id : INTEGER <<PK, FK users>>
+  * session_id : TEXT <<PK>>
+  --
+  experiment_id : INTEGER <<FK experiments>>
+  * title, started_at, status : TEXT
+  * duration_sec : REAL
+  * note_count : INTEGER
+  experiment_state : TEXT
+  review_count, other_voice_count : INTEGER
+  * session_json : TEXT (verbatim)
+  * audio_files : TEXT (JSON list)
+  * received_at / updated_at : TEXT
+}
+entity teams {
+  * id : INTEGER <<PK>>
+  --
+  * name : TEXT
+  * owner_id : INTEGER <<FK users>>
+  invite_token : TEXT <<UNIQUE>>
+  * created_at : TEXT
+}
+entity team_members {
+  * team_id : INTEGER <<PK, FK teams>>
+  * user_id : INTEGER <<PK, FK users>>
+  --
+  * role : owner | supervisor | member
+  * joined_at : TEXT
+}
+
+note bottom of notifications
+  kind = mentioned | note_added | note_updated |
+  collaborator_added | status_changed |
+  team_added | team_joined
+end note
+
+users ||--o{ auth_sessions
+users ||--o{ api_tokens
+users ||--o{ password_resets
+users ||--o{ experiments : owns
+users ||--o{ notes : writes
+experiments ||--o{ notes
+experiments ||--o{ collaborators
+users ||--o{ collaborators
+users ||--o{ notifications : receives
+experiments |o--o{ notifications
+users ||--o{ sessions : uploads
+experiments |o--o{ sessions : linked
+users ||--o{ teams : owns
+teams ||--o{ team_members
+users ||--o{ team_members
+teams |o--o{ experiments : shared with
+@enduml

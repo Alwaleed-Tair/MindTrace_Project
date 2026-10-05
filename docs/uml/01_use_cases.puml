@@ -1,0 +1,73 @@
+@startuml
+!include _style.iuml
+title MindTrace - Use Case Diagram
+left to right direction
+actor "Researcher\n(experiment owner)" as R
+actor "Collaborator /\nTeam member" as C
+actor "Team supervisor" as S
+actor "ESP32-S3 device" as D <<hardware>>
+actor "DeepSeek API" as AI <<external>>
+actor "Scholarly APIs\n(OpenAlex, Semantic Scholar,\narXiv, Crossref)" as LIT <<external>>
+actor "SMTP mail server" as MAIL <<external>>
+C <|-- R
+C <|-- S
+
+rectangle "Laptop app (listener + bridge)" {
+  usecase "Start / stop a recording\nwith the device button" as UC1
+  usecase "Split speech into title + notes\n(segmenter)" as UC2
+  usecase "Transcribe notes\n(Audar / Whisper, offline)" as UC3
+  usecase "Check the speaker's voice" as UC4
+  usecase "Link the laptop to an account\n(bridge --setup)" as UC5
+  usecase "Upload finished sessions\n(bridge --watch)" as UC6
+  usecase "Verify uploaded data\n(bridge --verify)" as UC7
+  usecase "Report live device status\n(heartbeat)" as UC8
+}
+
+rectangle "Web platform" {
+  usecase "Register / sign in /\nreset password" as P1
+  usecase "Create / edit / delete experiment" as P2
+  usecase "Change status\n(Active, Paused, Completed)" as P3
+  usecase "Add, edit, delete notes\n(typed or dictated)" as P4
+  usecase "@mention a member in a note" as P5
+  usecase "Add collaborators\n(email or MT-ID)" as P6
+  usecase "Create team / invite link /\nshare experiment with team" as P7
+  usecase "Manage team roles" as P8
+  usecase "Generate AI insights\n+ originality check" as P9
+  usecase "Translate insights (ar / en)" as P10
+  usecase "Receive notifications" as P11
+  usecase "Export report (PDF / DOCX)" as P12
+  usecase "See device status card" as P13
+  usecase "Listen to note audio" as P14
+}
+
+D --> UC1
+R --> UC1
+UC1 ..> UC2 : <<include>>
+UC2 ..> UC3 : <<include>>
+UC3 ..> UC4 : <<extend>>
+R --> UC5
+UC6 ..> UC8 : <<include>>
+R --> UC6
+R --> UC7
+
+C --> P1
+R --> P2
+R --> P3
+C --> P3
+C --> P4
+P4 ..> P5 : <<extend>>
+R --> P6
+R --> P7
+S --> P8
+C --> P9
+P9 --> AI
+P9 --> LIT
+P9 ..> P10 : <<extend>>
+P10 --> AI
+C --> P11
+C --> P12
+R --> P13
+C --> P14
+P1 --> MAIL
+UC6 --> P2 : creates / continues\nan experiment
+@enduml
