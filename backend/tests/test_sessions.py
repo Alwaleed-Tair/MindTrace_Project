@@ -248,3 +248,26 @@ def test_needs_review_is_only_shown_when_the_second_reading_really_disagrees(app
     eid = post(app, token(u), s).json()["experiment_id"]
     shown = [n["asr"]["needs_review"] for n in u.get(f"/api/experiments/{eid}").json()["notes"]]
     assert shown == [c[3] for c in cases], shown
+
+
+def test_a_long_or_empty_spoken_title_never_blocks_the_upload(app):
+    u = new_client(app, "r@x.com", "Researcher")
+    h = token(u)
+    long_title = "اليوم بنبدأ تجربة قياس الحرارة " * 12                    # kept talking without a pause: ~370 characters
+    s = sample()
+    s["session_id"], s["title"] = "long", long_title
+    s["notes"][0]["text"] = long_title
+    r = post(app, h, s)
+    assert r.status_code == 201, r.text
+    exp = u.get(f"/api/experiments/{r.json()['experiment_id']}").json()
+    assert len(exp["title"]) <= 160 and exp["title"].endswith("…") and long_title.startswith(exp["title"][:-1])
+    assert exp["notes"][0]["text"] == long_title.strip() and len(exp["notes"]) == 8   # nothing spoken is lost
+    assert post(app, h, s).status_code == 201                                          # sending it again: same experiment, no duplicate
+    assert len(u.get(f"/api/experiments/{r.json()['experiment_id']}").json()["notes"]) == 8
+    for sid, title in (("empty", ""), ("spaces", "   ")):
+        s = sample()
+        s["session_id"], s["title"] = sid, title
+        s["notes"][0]["text"] = title
+        r = post(app, h, s)
+        assert r.status_code == 201, r.text
+        assert u.get(f"/api/experiments/{r.json()['experiment_id']}").json()["title"] == "Untitled recording"

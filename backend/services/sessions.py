@@ -46,6 +46,25 @@ def summary_row(r) -> dict:
             "experiment_id": str(r["experiment_id"]) if r["experiment_id"] else None}
 
 
+TITLE_MAX = 160
+
+
+def experiment_title(title: str | None) -> str:
+    """The spoken title as an experiment title: empty -> "Untitled recording"; a long one (the researcher kept talking
+    without a pause) is cut at a word, and the full text is kept as a note (see _sync_notes)."""
+    t = " ".join((title or "").split())
+    if not t:
+        return "Untitled recording"
+    if len(t) <= TITLE_MAX:
+        return t
+    cut = t[:TITLE_MAX - 1]
+    return (cut[:cut.rfind(" ")] if " " in cut[TITLE_MAX // 2:] else cut).rstrip(" ,.،؛") + "…"
+
+
+def _is_long_title(sn) -> bool:
+    return sn.kind == "title" and len(" ".join(sn.text.split())) > TITLE_MAX
+
+
 def upsert(db: Database, owner_id: int, raw: dict, s: SessionIn, audio_files: list[str]) -> tuple[bool, int]:
     """Store the session and sync its experiment. Returns (already_existed, experiment_id)."""
     prev = db.one("SELECT experiment_id FROM sessions WHERE owner_id=? AND session_id=?", (owner_id, s.session_id))
@@ -54,13 +73,13 @@ def upsert(db: Database, owner_id: int, raw: dict, s: SessionIn, audio_files: li
     exp_id = prev["experiment_id"] if prev and prev["experiment_id"] else None
     if exp_id is not None and db.one("SELECT 1 FROM experiments WHERE id=?", (exp_id,)) is None:
         exp_id = None
-    if exp_id is None and s.title:
+    if exp_id is None and s.title.strip():
         exp_id = find_by_title(db, owner_id, s.title)                 # same spoken title: continue that experiment
         if exp_id is not None and state in _RESUME_STATUS:
             with db.tx() as c:
                 c.execute("UPDATE experiments SET status=? WHERE id=?", (_RESUME_STATUS[state], exp_id))
     if exp_id is None:
-        exp_id = ex.create_experiment(db, owner_id, s.title or "Untitled recording", "", ["Recording"], status=STATE_TO_STATUS.get(state, "Active"),
+        exp_id = ex.create_experiment(db, owner_id, experiment_title(s.title), "", ["Recording"], status=STATE_TO_STATUS.get(state, "Active"),
                                       originality=50, duration_sec=s.duration_sec, session_id=s.session_id)
     with db.tx() as c:
         c.execute("""INSERT INTO sessions (owner_id, session_id, experiment_id, received_at, updated_at, title, started_at, duration_sec,
@@ -90,8 +109,8 @@ def _sync_notes(db: Database, owner_id: int, exp_id: int, s: SessionIn) -> int:
             existing[(m.get("session_id") or first, m["session_note_id"])] = n
     added = 0
     for sn in s.notes:
-        if sn.kind != "note" or not sn.text.strip():                  # the spoken title became the experiment title
-            continue
+        if not sn.text.strip() or (sn.kind != "note" and not _is_long_title(sn)):
+            continue                                                  # the spoken title became the experiment title (a long one is also kept as a note)
         meta = {"session_id": s.session_id, "session_note_id": sn.id, "audio_file": sn.audio_file, "asr": sn.asr, "speaker_check": sn.speaker_check}
         hit = existing.get((s.session_id, sn.id))
         if hit is None:

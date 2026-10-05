@@ -211,7 +211,9 @@ def verify_session(client: httpx.Client, base_url: str, folder: Path, with_full:
     by_id = {n["session_note_id"]: n for n in exp.get("notes", []) if n.get("session_id") == sid and n.get("session_note_id") is not None}
     ok = edited = 0
     for sn in local.get("notes", []):
-        if sn.get("kind", "note") != "note" or not str(sn.get("text", "")).strip():
+        text = " ".join(str(sn.get("text", "")).split())
+        long_title = sn.get("kind") == "title" and len(text) > 160      # a long spoken title is also kept as a note
+        if not text or (sn.get("kind", "note") != "note" and not long_title):
             continue                                                  # the spoken title becomes the experiment title
         n = by_id.get(sn.get("id"))
         if n is None:

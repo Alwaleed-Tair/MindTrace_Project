@@ -168,3 +168,16 @@ def test_verify_says_everything_arrived_and_catches_every_kind_of_difference(tmp
     user.delete(f"/api/notes/{nid}")
     problems, _ = br.verify_session(client, "http://t", folder, True, token)
     assert any(f"note {spoken[0]['id']}" in p and "missing" in p for p in problems)
+
+
+def test_verify_accepts_a_long_spoken_title_kept_as_a_note(tmp_path):
+    app, user, client, token = setup(tmp_path)
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    folder = make_session_folder(sessions, "long")
+    s = json.loads((folder / "session.json").read_text(encoding="utf-8"))
+    s["title"] = s["notes"][0]["text"] = "قسنا الحرارة " * 20
+    (folder / "session.json").write_text(json.dumps(s, ensure_ascii=False), encoding="utf-8")
+    assert br.run_once(client, "http://t", sessions, {}, True, token, say=lambda *_: None) == (1, 0)
+    problems, info = br.verify_session(client, "http://t", folder, True, token)
+    assert problems == [] and "8 note(s) match" in info[-1]
