@@ -198,6 +198,10 @@ export function useInvite(token: string) {
 }
 
 /** Is the recording device linked and live? Polled so the sidebar card follows the laptop app. */
+export function useMembers(id: string) {
+  return useQuery({ queryKey: ['members', id], queryFn: () => api.members(id).then((r) => r.items), retry, staleTime: 60_000 });
+}
+
 export function useBridgeStatus(enabled = true) {
   return useQuery({ queryKey: ['bridge-status'], queryFn: api.bridgeStatus, enabled, retry, refetchInterval: 5000, refetchIntervalInBackground: false });
 }

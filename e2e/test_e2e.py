@@ -342,3 +342,39 @@ def test_edit_and_delete_a_note(make_page, server):
     expect(p.tid("notes-empty")).to_be_visible()
     p.pg.reload()
     expect(p.tid("notes-empty")).to_be_visible()
+
+
+def test_mention_a_person_in_a_note(make_page, server):
+    a, b = make_page(), make_page()
+    a.register("Alice A", "a@lab.com")
+    b.register("بدر الحربي", "b@lab.com")
+    exp_id = a.create_experiment("Mention run")
+    r = a.pg.evaluate(f"""fetch('/api/experiments/{exp_id}/collaborators', {{method: 'POST', credentials: 'include',
+        headers: {{'Content-Type': 'application/json', 'X-Requested-With': 'mindtrace'}}, body: JSON.stringify({{identifier: 'b@lab.com'}})}}).then(r => r.status)""")
+    assert r == 201
+    a.pg.reload()
+    box = a.tid("textarea-new-note")
+    box.click()
+    box.press_sequentially("check this @بد")
+    expect(a.tid("mention-list")).to_contain_text("بدر الحربي")
+    expect(a.tid("mention-list")).not_to_contain_text("Alice A")          # filtered by what was typed
+    box.press("Enter")                                                      # Enter picks the person, it does not save
+    box.press_sequentially("please weigh the sample")
+    expect(a.tid("mention-list")).to_have_count(0)                         # typing on after the name closes the list
+    expect(box).to_have_value("check this @بدر الحربي please weigh the sample")
+    a.tid("button-save-note").click()
+    chip = a.tid("mention-chip").first
+    expect(chip).to_have_text("@بدر الحربي")
+    # Bob gets a "mentioned you" alert, and only that one for this note
+    expect(b.tid("toast-notification").first).to_contain_text("Alice A", timeout=15000)
+    items = b.pg.evaluate("fetch('/api/notifications').then(r=>r.json()).then(j=>j.items.map(i=>i.kind))")
+    assert items.count("mentioned") == 1 and "note_added" not in items
+    # editing shows the name, not the stored id, and keeps the mention
+    nid = a.pg.locator("[data-testid^=note-text-]").first.get_attribute("data-testid").split("-")[-1]
+    a.tid("note-edit-" + nid).click()
+    expect(a.tid("note-edit-text-" + nid)).to_have_value("check this @بدر الحربي please weigh the sample")
+    a.tid("note-edit-text-" + nid).fill("check this @بدر الحربي please weigh it twice")
+    a.tid("note-edit-save-" + nid).click()
+    expect(a.tid("note-text-" + nid)).to_contain_text("weigh it twice")
+    expect(a.tid("mention-chip").first).to_have_text("@بدر الحربي")
+    assert a.errors == [] and b.errors == []

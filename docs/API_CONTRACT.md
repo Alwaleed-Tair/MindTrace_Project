@@ -32,6 +32,7 @@
 | DELETE | `/api/experiments/{id}` | المالك فقط. يحذف النوتس والتعاون والإشعارات والتسجيل الأصلي وملفات الصوت | نعم |
 | POST | `/api/experiments/{id}/notes` | `{text,kind?}` | نعم |
 | PATCH | `/api/notes/{id}` | `{text?,kind?}` الكاتب أو المالك | نعم |
+| GET | `/api/experiments/{id}/members` | `{items:[{id,name,lab,initials,role:"owner"\|"member"}]}` من يمكن الإشارة له (بدون إيميلات) | نعم |
 | DELETE | `/api/notes/{id}` | الكاتب أو المالك | نعم |
 | GET | `/api/experiments/{id}/notes/{noteId}/audio` | صوت النوت المسجّل (wav) | نعم |
 | GET | `/api/users/search?q=` | مطابقة **تامة** لبريد أو ID (ما في تصفح للمستخدمين) | نعم |
@@ -84,6 +85,8 @@
            "time_label":"01:12","created_at":"...","author":{},"has_audio":true,"can_edit":true,
            "asr":{"language":"Arabic","confidence":0.63,"needs_review":true,"alternative":{"engine":"faster-whisper","model":"turbo","text":"..."}}}]}
 ```
+**الإشارات:** داخل نص الملاحظة تُكتب `@{MT-XXXXXXXX}`. كل نوت فيها `mentions:[{id,name,lab,initials}]` (أعضاء التجربة فقط، بأسمائهم الحالية)، و`session_id`/`session_note_id` للنوتس اللي جات من الجهاز. المذكور يوصله تنبيه `kind:"mentioned"` بدل `note_added`. الذكاء الاصطناعي يشوف `@الاسم`.
+
 (`notes` تظهر في `GET /experiments/{id}` فقط. `trace` = آخر 40 ملاحظة بوقتها ونوعها، ترسمها بطاقة التجربة. `team` = الفريق المشتركة معه أو `null`. `originality` لا تعرضه الواجهة إلا بعد اكتمال التحليل.) **`needs_review` تلميح مو دليل**: نص غلط ممكن يطلع بثقة عالية، والصوت هو المرجع.
 
 ## الإشعارات

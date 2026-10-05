@@ -172,6 +172,85 @@ def upload(client: httpx.Client, base_url: str, folder: Path, with_full: bool, t
     return r.json()
 
 
+def verify_session(client: httpx.Client, base_url: str, folder: Path, with_full: bool, token: str) -> tuple[list[str], list[str]]:
+    """Compare one local session folder with what the platform stored: the session.json byte-for-byte (as JSON), every
+    WAV by sha256, and every spoken note (text, time, audio) in the experiment. Returns (problems, info)."""
+    base, h = base_url.rstrip("/"), {"Authorization": f"Bearer {token}"}
+    local = json.loads((folder / "session.json").read_text(encoding="utf-8"))
+    sid = local.get("session_id")
+    r = client.get(f"{base}/api/sessions/{sid}", headers=h, timeout=30)
+    if r.status_code == 404:
+        return [f"not on the platform yet (session {sid})"], []
+    r.raise_for_status()
+    remote = r.json()
+    problems, info = [], []
+    if remote["session"] != local:
+        diff = sorted(k for k in set(local) | set(remote["session"]) if local.get(k) != remote["session"].get(k))
+        problems.append("session.json differs from what the platform stored (fields: " + ", ".join(diff[:8]) + "). Upload again.")
+    else:
+        info.append("session.json identical")
+    ok_audio = 0
+    for p in audio_parts(folder, with_full):
+        rel = p.relative_to(folder).as_posix()
+        if rel not in remote["audio_files"]:
+            problems.append(f"audio {rel} missing on the platform")
+            continue
+        a = client.get(f"{base}/api/sessions/{sid}/audio/{rel}", headers=h, timeout=120)
+        if a.status_code != 200 or hashlib.sha256(a.content).hexdigest() != sha256_of(p):
+            problems.append(f"audio {rel} differs on the platform")
+        else:
+            ok_audio += 1
+    info.append(f"{ok_audio} audio file(s) identical (sha256)")
+    exp_id = remote.get("experiment_id")
+    if not exp_id:
+        problems.append("the session is not linked to an experiment")
+        return problems, info
+    e = client.get(f"{base}/api/experiments/{exp_id}", headers=h, timeout=30)
+    e.raise_for_status()
+    exp = e.json()
+    by_id = {n["session_note_id"]: n for n in exp.get("notes", []) if n.get("session_id") == sid and n.get("session_note_id") is not None}
+    ok = edited = 0
+    for sn in local.get("notes", []):
+        if sn.get("kind", "note") != "note" or not str(sn.get("text", "")).strip():
+            continue                                                  # the spoken title becomes the experiment title
+        n = by_id.get(sn.get("id"))
+        if n is None:
+            problems.append(f"note {sn.get('id')} ({sn.get('time_label')}) is missing in the experiment")
+            continue
+        bad = []
+        if n["text_source"] == "human":
+            edited += 1                                               # a person corrected it on the platform: expected to differ
+        elif n["text"] != sn["text"].strip():
+            bad.append("text")
+        if n.get("time_label") != sn.get("time_label"):
+            bad.append("time")
+        if sn.get("audio_file") and (folder / sn["audio_file"]).is_file() and not n.get("has_audio"):
+            bad.append("audio")                                       # only when the laptop has the file but the platform does not
+        if bad:
+            problems.append(f"note {sn.get('id')} ({sn.get('time_label')}): {', '.join(bad)} differ")
+        else:
+            ok += 1
+    info.append(f"{ok} note(s) match in \"{exp.get('title')}\"" + (f", {edited} corrected by a person on the platform" if edited else ""))
+    return problems, info
+
+
+def verify_all(client: httpx.Client, base_url: str, sessions_dir: Path, with_full: bool, token: str, say=print) -> int:
+    folders = find_sessions(sessions_dir)
+    if not folders:
+        say(f"No finished sessions in {sessions_dir}.")
+        return 0
+    bad = 0
+    for folder in folders:
+        try:
+            problems, info = verify_session(client, base_url, folder, with_full, token)
+        except (httpx.HTTPError, OSError, ValueError, KeyError) as exc:
+            problems, info = [f"could not check ({exc.__class__.__name__}: {str(exc)[:150]})"], []
+        bad += bool(problems)
+        say(f"{'OK ' if not problems else 'BAD'} {folder.name}: " + "; ".join(info + problems))
+    say(f"\n{len(folders) - bad} of {len(folders)} session(s) arrived exactly as recorded." + ("" if not bad else "  Run the bridge again to re-upload."))
+    return 1 if bad else 0
+
+
 def run_once(client: httpx.Client, base_url: str, sessions_dir: Path, state: dict, with_full: bool, token: str,
              dry_run: bool = False, say=print) -> tuple[int, int]:
     sent = failed = 0
@@ -204,6 +283,7 @@ def main(argv=None) -> int:
     ap.add_argument("--watch", action="store_true", help="keep running and upload new sessions")
     ap.add_argument("--interval", type=float, default=cfg("WATCH_INTERVAL_SEC", 20))
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--verify", action="store_true", help="check that every finished session on this laptop is on the platform exactly as recorded")
     ap.add_argument("--setup", action="store_true", help="log in once with your platform email + password and save a token")
     a = ap.parse_args(argv)
     if a.setup:
@@ -258,6 +338,8 @@ def main(argv=None) -> int:
             if me:
                 print(f"Uploading to the account: {me.get('name')} <{me.get('email')}>   "
                       f"(not yours? run  python mindtrace_bridge.py --setup)")
+        if a.verify:
+            return verify_all(client, a.url, sessions_dir, with_full, token)
         next_scan = 0.0
         while True:
             if time.monotonic() >= next_scan:

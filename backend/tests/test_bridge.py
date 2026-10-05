@@ -131,3 +131,40 @@ def test_setup_logs_in_once_saves_a_token_and_never_the_password(tmp_path):
     state, log = {}, []
     br.run_once(TestClient(app), "http://testserver", sessions, state, True, token, say=log.append)
     assert state["s1"]["session_id"] == "s1"                                     # the saved token really uploads
+
+
+def test_verify_says_everything_arrived_and_catches_every_kind_of_difference(tmp_path):
+    app, user, client, token = setup(tmp_path)
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    folder = make_session_folder(sessions, "v1")
+    log = []
+    assert br.verify_all(client, "http://t", sessions, True, token, say=log.append) == 1      # not uploaded yet
+    assert "not on the platform yet" in log[0]
+    br.run_once(client, "http://t", sessions, {}, True, token, say=lambda *_: None)
+    log.clear()
+    assert br.verify_all(client, "http://t", sessions, True, token, say=log.append) == 0
+    assert log[0].startswith("OK ") and "session.json identical" in log[0] and "3 audio file(s) identical" in log[0]
+    assert "1 of 1 session(s) arrived exactly as recorded" in log[-1]
+    local = json.loads((folder / "session.json").read_text(encoding="utf-8"))
+    spoken = [n for n in local["notes"] if n.get("kind", "note") == "note" and n["text"].strip()]
+    assert f"{len(spoken)} note(s) match" in log[0]
+
+    # a person corrects a note on the platform: still OK, and said so
+    exp_id = user.get("/api/sessions/v1").json()["experiment_id"]
+    nid = next(n["id"] for n in user.get(f"/api/experiments/{exp_id}").json()["notes"] if n["session_note_id"] == spoken[0]["id"])
+    user.patch(f"/api/notes/{nid}", json={"text": "fixed by hand"})
+    problems, info = br.verify_session(client, "http://t", folder, True, token)
+    assert problems == [] and "1 corrected by a person" in info[-1]
+
+    # a damaged audio file and a changed session.json are both caught
+    (folder / "notes" / "note_01.wav").write_bytes(make_wav(2))
+    local["notes"][0]["text"] += " (changed)"
+    (folder / "session.json").write_text(json.dumps(local, ensure_ascii=False), encoding="utf-8")
+    problems, _ = br.verify_session(client, "http://t", folder, True, token)
+    assert any("session.json differs" in p and "notes" in p for p in problems)
+    assert any("audio notes/note_01.wav differs" in p for p in problems)
+    # a note deleted on the platform is reported missing
+    user.delete(f"/api/notes/{nid}")
+    problems, _ = br.verify_session(client, "http://t", folder, True, token)
+    assert any(f"note {spoken[0]['id']}" in p and "missing" in p for p in problems)

@@ -15,7 +15,8 @@ import { NotesTimeline } from '@/components/experiment/NotesTimeline';
 import { Avatar } from '@/components/common/Avatar';
 import { SessionTrace, kindColor, tracePositions, usesRecordingClock } from '@/components/common/Trace';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useAddNote, useExperiment, useInsights, useSetStatus } from '@/hooks/queries';
+import { useAddNote, useExperiment, useInsights, useMembers, useSetStatus } from '@/hooks/queries';
+import { toStored } from '@/lib/mentions';
 import { useDictation } from '@/hooks/useDictation';
 import { ApiError } from '@/lib/api';
 import { clockTime, fill, relativeTime } from '@/lib/format';
@@ -46,12 +47,13 @@ function Detail({ experiment }: { experiment: Experiment }) {
   const dictation = useDictation(language === 'ar' ? 'ar-SA' : 'en-US', (text) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text)));
   const recording = dictation.listening;
   const addNote = useAddNote(experiment.id);
+  const members = useMembers(experiment.id).data ?? [];
   const translate = useAutoTranslate(experiment.id);
   const ignoredIds = useInsights(experiment.id).data?.result?.ignored_note_ids;
   const wasListening = useRef(false);
   // pressing stop saves what was said as a note (it can still be edited afterwards from the timeline)
   useEffect(() => {
-    if (wasListening.current && !recording && draft.trim()) addNote.mutate(draft.trim(), { onSuccess: () => setDraft('') });
+    if (wasListening.current && !recording && draft.trim()) addNote.mutate(toStored(draft.trim(), members), { onSuccess: () => setDraft('') });
     wasListening.current = recording;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recording]);

@@ -10,6 +10,7 @@ from api.deps import current_user, db, settings
 from services import experiments as ex
 from services import ai as ai_service
 from services import insights as insights_service
+from services import mentions
 from services import storage
 from services import users as users_service
 
@@ -87,6 +88,14 @@ def patch_experiment(exp_id: str, body: ExperimentPatch, request: Request, user=
 @router.delete("/experiments/{exp_id}", status_code=204)
 def delete_experiment(exp_id: str, request: Request, user=Depends(current_user)):
     ex.delete_experiment(db(request), _id(exp_id), user["id"], settings(request).audio_dir)
+
+
+@router.get("/experiments/{exp_id}/members")
+def members(exp_id: str, request: Request, user=Depends(current_user)):
+    """The people who can be @mentioned in this experiment's notes."""
+    d = db(request)
+    ex.require(d, _id(exp_id), user["id"])
+    return {"items": mentions.member_list(d, _id(exp_id))}
 
 
 # ------------------------------------------------------------------ notes

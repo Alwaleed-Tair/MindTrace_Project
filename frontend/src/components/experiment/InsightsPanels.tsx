@@ -3,6 +3,7 @@ import { ExternalLink, Languages, Lightbulb, RefreshCw, Sparkles } from 'lucide-
 import { usePreferences } from '@/context/PreferencesContext';
 import { useInsights, useRefreshInsights, useTranslateInsights, useUpdateNote } from '@/hooks/queries';
 import { fill } from '@/lib/format';
+import { toDisplay, toStored } from '@/lib/mentions';
 import type { Experiment, Insights, Literature, SimilarPaper } from '@/lib/types';
 
 export function CircularScore({ value }: { value: number }) {
@@ -169,11 +170,11 @@ export function InsightsTab({ experiment, translate }: { experiment: Experiment;
                   const n = noteById.get(s.note_id);
                   return (
                     <li key={s.note_id} className="rounded-xl border border-border bg-background p-4 text-xs leading-5" data-testid={`suggestion-${s.note_id}`}>
-                      {n && <p className="text-muted-foreground line-through decoration-muted-foreground/40" dir="auto">{n.text}</p>}
+                      {n && <p className="text-muted-foreground line-through decoration-muted-foreground/40" dir="auto">{toDisplay(n.text, n.mentions ?? [])}</p>}
                       <p className="mt-1 font-semibold" dir="auto">{s.suggested_text}</p>
                       <p className="mt-1 text-muted-foreground" dir="auto">{s.reason}</p>
-                      {n?.can_edit && n.text !== s.suggested_text && (
-                        <button type="button" onClick={() => update.mutate({ noteId: s.note_id, text: s.suggested_text })} disabled={update.isPending} className="mt-2 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50" data-testid={`button-use-suggestion-${s.note_id}`}>
+                      {n?.can_edit && toDisplay(n.text, n.mentions ?? []) !== s.suggested_text && (
+                        <button type="button" onClick={() => update.mutate({ noteId: s.note_id, text: toStored(s.suggested_text, n.mentions ?? []) })} disabled={update.isPending} className="mt-2 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50" data-testid={`button-use-suggestion-${s.note_id}`}>
                           {t.useThis}
                         </button>
                       )}

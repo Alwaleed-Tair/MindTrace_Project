@@ -11,6 +11,10 @@ export interface Person {
   email?: string;
 }
 
+export interface Member extends Person {
+  role: 'owner' | 'member';
+}
+
 export interface AsrInfo {
   language: string | null;
   confidence: number;
@@ -32,6 +36,7 @@ export interface Note {
   asr: AsrInfo | null;
   audio_file: string | null;
   has_audio: boolean;
+  mentions?: Person[];
   can_edit: boolean;
 }
 
@@ -129,7 +134,7 @@ export interface Insights {
   needs_translation?: boolean;
 }
 
-export type NotificationKind = 'note_added' | 'note_updated' | 'collaborator_added' | 'status_changed' | 'team_added' | 'team_joined';
+export type NotificationKind = 'mentioned' | 'note_added' | 'note_updated' | 'collaborator_added' | 'status_changed' | 'team_added' | 'team_joined';
 
 export interface NotificationItem {
   id: number | string;

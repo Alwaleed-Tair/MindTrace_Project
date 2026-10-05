@@ -2,7 +2,9 @@ import { AudioLines, Eye, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
-import { useDeleteNote, useUpdateNote } from '@/hooks/queries';
+import { useDeleteNote, useMembers, useUpdateNote } from '@/hooks/queries';
+import { segments, toDisplay, toStored } from '@/lib/mentions';
+import { MentionTextarea } from './MentionTextarea';
 import { clockTime, fill } from '@/lib/format';
 import { kindColor } from '@/components/common/Trace';
 import type { Note } from '@/lib/types';
@@ -13,16 +15,34 @@ function NoteAudio({ experimentId, noteId }: { experimentId: string; noteId: num
   return <audio controls preload="none" className="mt-3 h-8 w-full max-w-sm" src={`/api/experiments/${encodeURIComponent(experimentId)}/notes/${noteId}/audio`} onError={() => setFailed(true)} data-testid={`audio-${noteId}`} />;
 }
 
+/** Note text with @mentions shown as name chips. */
+export function NoteText({ note, className }: { note: Note; className?: string }) {
+  return (
+    <p className={className} dir="auto" data-testid={`note-text-${note.id}`}>
+      {segments(note.text, note.mentions ?? []).map((s, i) =>
+        'person' in s ? (
+          <span key={i} className="rounded-md bg-primary/10 px-1 py-0.5 font-semibold text-primary" title={s.person.id} data-testid="mention-chip">@{s.person.name}</span>
+        ) : (
+          <span key={i}>{s.text}</span>
+        ),
+      )}
+    </p>
+  );
+}
+
 /** The text of a note, with Edit / Delete for the people allowed to change it (the writer or the experiment owner). */
 function NoteBody({ experimentId, note }: { experimentId: string; note: Note }) {
   const { t } = usePreferences();
   const [editing, setEditing] = useState(false);
   const [asking, setAsking] = useState(false);
-  const [text, setText] = useState(note.text);
+  const members = useMembers(experimentId).data ?? [];
+  const people = [...members, ...(note.mentions ?? [])];
+  const shown = () => toDisplay(note.text, note.mentions ?? []);
+  const [text, setText] = useState(shown);
   const update = useUpdateNote(experimentId);
   const remove = useDeleteNote(experimentId);
   const save = () => {
-    const value = text.trim();
+    const value = toStored(text.trim(), people);
     if (!value || update.isPending) return;
     if (value === note.text) return setEditing(false);
     update.mutate({ noteId: note.id, text: value }, { onSuccess: () => setEditing(false) });
@@ -30,18 +50,18 @@ function NoteBody({ experimentId, note }: { experimentId: string; note: Note }) 
   if (editing) {
     return (
       <div className="mt-2" data-testid={`note-editor-${note.id}`}>
-        <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} rows={4} maxLength={5000} dir="auto" className="w-full resize-y rounded-xl border border-input bg-background px-3 py-2.5 text-sm leading-6 outline-none focus:border-primary" data-testid={`note-edit-text-${note.id}`} />
+        <MentionTextarea autoFocus value={text} onValue={setText} members={members} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} rows={4} maxLength={5000} dir="auto" className="w-full resize-y rounded-xl border border-input bg-background px-3 py-2.5 text-sm leading-6 outline-none focus:border-primary" data-testid={`note-edit-text-${note.id}`} />
         {update.isError && <p className="mt-1 text-xs font-semibold text-destructive" role="alert">{t.noteEditFailed}</p>}
         <div className="mt-2 flex gap-2">
           <button type="button" onClick={save} disabled={!text.trim() || update.isPending} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40" data-testid={`note-edit-save-${note.id}`}>{t.saveNote}</button>
-          <button type="button" onClick={() => { setEditing(false); setText(note.text); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted" data-testid={`note-edit-cancel-${note.id}`}>{t.cancel}</button>
+          <button type="button" onClick={() => { setEditing(false); setText(shown()); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted" data-testid={`note-edit-cancel-${note.id}`}>{t.cancel}</button>
         </div>
       </div>
     );
   }
   return (
     <>
-      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground/80" dir="auto">{note.text}</p>
+      <NoteText note={note} className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground/80" />
       {note.can_edit && (
         <div className="mt-1.5 flex items-center gap-1 text-[11px]">
           {asking ? (
@@ -53,7 +73,7 @@ function NoteBody({ experimentId, note }: { experimentId: string; note: Note }) 
             </span>
           ) : (
             <>
-              <button type="button" onClick={() => { setText(note.text); setEditing(true); }} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" data-testid={`note-edit-${note.id}`}><Pencil size={11} />{t.editNote}</button>
+              <button type="button" onClick={() => { setText(shown()); setEditing(true); }} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" data-testid={`note-edit-${note.id}`}><Pencil size={11} />{t.editNote}</button>
               <button type="button" onClick={() => setAsking(true)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive" data-testid={`button-delete-note-${note.id}`}><Trash2 size={11} />{t.deleteNote}</button>
             </>
           )}

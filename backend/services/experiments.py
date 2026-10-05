@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from core.db import Database
 from services.users import iso, now, public
+from services import mentions
 
 STATUSES = ("Active", "Paused", "Completed")
 NOTE_KINDS = ("observation",)      # one kind only: a note. "hypothesis" and "decision" were removed; older ones became notes
@@ -116,7 +117,10 @@ def serialize_note(db: Database, n, user_id: int, owner_id: int, audio_files: se
             "time_label": n["time_label"], "created_at": n["created_at"], "updated_at": n["updated_at"],
             "author": public(author, include_email=False) if author else None,
             "asr": asr, "speaker_check": meta.get("speaker_check"), "audio_file": meta.get("audio_file"),
+            "session_id": meta.get("session_id") or (first_session if meta.get("session_note_id") is not None else None),
+            "session_note_id": meta.get("session_note_id"),
             "has_audio": bool(meta.get("audio_file")) and (meta.get("session_id") or first_session, meta.get("audio_file")) in audio_files,
+            "mentions": [public(u, include_email=False) for u in mentions.mentioned(db, n["experiment_id"], n["text"])],
             "can_edit": n["author_id"] == user_id or owner_id == user_id}
 
 
@@ -283,7 +287,8 @@ def add_note(db: Database, exp_id: int, user_id: int, text, kind: str = "observa
                                                              json.dumps(meta or {}, ensure_ascii=False), ts, ts)).lastrowid
         c.execute("UPDATE experiments SET updated_at=? WHERE id=?", (ts, exp_id))
     if notify:
-        notify_members(db, exp_id, user_id, "note_added", "added a note", note_id=nid)
+        tagged = _notify_mentions(db, exp_id, user_id, text, nid)
+        notify_members(db, exp_id, user_id, "note_added", "added a note", note_id=nid, skip=tagged)
     return serialize_note(db, db.one("SELECT * FROM notes WHERE id=?", (nid,)), user_id, db.one("SELECT owner_id FROM experiments WHERE id=?", (exp_id,))["owner_id"])
 
 
@@ -299,7 +304,7 @@ def update_note(db: Database, note_id: int, user_id: int, patch: dict) -> dict:
     owner_id = db.one("SELECT owner_id FROM experiments WHERE id=?", (n["experiment_id"],))["owner_id"]
     if n["author_id"] != user_id and owner_id != user_id:
         raise Forbidden("only the author or the experiment owner can edit this note")
-    sets, args = [], []
+    sets, args, tagged = [], [], set()
     if "text" in patch:
         sets += ["text=?", "text_source='human'"]; args.append(_clean_text(patch["text"]))
     if "kind" in patch:
@@ -312,7 +317,10 @@ def update_note(db: Database, note_id: int, user_id: int, patch: dict) -> dict:
     with db.tx() as c:
         c.execute(f"UPDATE notes SET {', '.join(sets)}, updated_at=? WHERE id=?", (*args, ts, note_id))
         c.execute("UPDATE experiments SET updated_at=? WHERE id=?", (ts, n["experiment_id"]))
-    notify_members(db, n["experiment_id"], user_id, "note_updated", "updated a note", note_id=note_id)
+    if "text" in patch:                                                          # only people newly mentioned by this edit
+        before = {u["id"] for u in mentions.mentioned(db, n["experiment_id"], n["text"])}
+        tagged = _notify_mentions(db, n["experiment_id"], user_id, args[0], note_id, already=before)
+    notify_members(db, n["experiment_id"], user_id, "note_updated", "updated a note", note_id=note_id, skip=tagged)
     return serialize_note(db, db.one("SELECT * FROM notes WHERE id=?", (note_id,)), user_id, owner_id)
 
 
@@ -361,14 +369,26 @@ def notify_user(db: Database, recipient_id: int, actor_id: int, kind: str, messa
            (recipient_id, actor_id, kind, message, iso()))
 
 
-def notify_members(db: Database, exp_id: int, actor_id: int, kind: str, message: str, note_id: int | None = None) -> int:
-    """Everyone in the experiment except the person who did it."""
+def _notify_mentions(db: Database, exp_id: int, actor_id: int, text: str, note_id: int, already: set[int] = frozenset()) -> set[int]:
+    """Tell each person mentioned in the note (not the author, not people already mentioned before an edit). Returns who was told."""
+    told = set()
+    for u in mentions.mentioned(db, exp_id, text):
+        if u["id"] != actor_id and u["id"] not in already:
+            _notify_one(db, u["id"], actor_id, exp_id, "mentioned", "mentioned you in a note", note_id)
+            told.add(u["id"])
+    return told
+
+
+def notify_members(db: Database, exp_id: int, actor_id: int, kind: str, message: str, note_id: int | None = None,
+                   skip: set[int] = frozenset()) -> int:
+    """Everyone in the experiment except the person who did it (and anyone in skip, who already got a more specific one)."""
     exp = db.one("SELECT owner_id FROM experiments WHERE id=?", (exp_id,))
     if exp is None:
         return 0
     ids = {exp["owner_id"]} | {r["user_id"] for r in db.all("SELECT user_id FROM collaborators WHERE experiment_id=?", (exp_id,))}
     ids |= {r["user_id"] for r in db.all("""SELECT m.user_id FROM team_members m JOIN experiments e ON e.team_id=m.team_id WHERE e.id=?""", (exp_id,))}
     ids.discard(actor_id)
+    ids -= set(skip)
     for rid in ids:
         _notify_one(db, rid, actor_id, exp_id, kind, message, note_id)
     return len(ids)

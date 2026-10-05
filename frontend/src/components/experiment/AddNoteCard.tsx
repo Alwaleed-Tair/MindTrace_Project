@@ -2,8 +2,10 @@ import { Mic, PencilLine, Square } from 'lucide-react';
 import { useState } from 'react';
 import { usePreferences } from '@/context/PreferencesContext';
 import type { Dictation } from '@/hooks/useDictation';
-import { useAddNote } from '@/hooks/queries';
+import { useAddNote, useMembers } from '@/hooks/queries';
 import { ApiError } from '@/lib/api';
+import { toStored } from '@/lib/mentions';
+import { MentionTextarea } from './MentionTextarea';
 
 
 export const NOTE_TEXTAREA_ID = 'new-note-text';
@@ -20,11 +22,12 @@ export function AddNoteCard({ experimentId, text, onText, dictation }: Props) {
   const { t } = usePreferences();
   const [error, setError] = useState<string | null>(null);
   const add = useAddNote(experimentId);
+  const members = useMembers(experimentId).data ?? [];
   const save = () => {
     const value = text.trim();
     if (!value || add.isPending) return;
     setError(null);
-    add.mutate(value, {
+    add.mutate(toStored(value, members), {
       onSuccess: () => onText(''),
       onError: (e) => setError(e instanceof ApiError ? e.message : t.noteSaveFailed),
     });
@@ -36,11 +39,12 @@ export function AddNoteCard({ experimentId, text, onText, dictation }: Props) {
         <h3 className="text-sm font-semibold">{t.addNote}</h3>
         <PencilLine size={15} className="text-primary" />
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{t.addNoteSub}</p>
-      <textarea
+      <p className="mt-1 text-xs text-muted-foreground">{t.addNoteSub} {members.length > 1 && <span data-testid="mention-hint">· {t.mentionHint}</span>}</p>
+      <MentionTextarea
         id={NOTE_TEXTAREA_ID}
         value={text}
-        onChange={(e) => onText(e.target.value)}
+        onValue={onText}
+        members={members}
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save();
         }}

@@ -1,4 +1,4 @@
-import type { BridgeStatus, Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, Team, TeamDetail, InvitePreview } from './types';
+import type { BridgeStatus, Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, Team, TeamDetail, InvitePreview, Member } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -93,6 +93,7 @@ export const api = {
   updateExperiment: (id: string, fields: { title?: string; summary?: string }) => patch<Experiment>(`/experiments/${encodeURIComponent(id)}`, fields),
 
   addNote: (id: string, text: string, kind: NoteKind = 'observation') => post<Note>(`/experiments/${encodeURIComponent(id)}/notes`, { text, kind }),
+  members: (id: string) => get<{ items: Member[] }>(`/experiments/${encodeURIComponent(id)}/members`),
   updateNote: (noteId: number, text: string) => patch<Note>(`/notes/${noteId}`, { text }),
   deleteNote: (noteId: number) => del(`/notes/${noteId}`),
 

@@ -1,5 +1,6 @@
 import { translations, type Strings } from './i18n';
 import { fill } from './format';
+import { toDisplay } from './mentions';
 import type { Experiment, Insights, Language, NoteKind, Person, SimilarPaper, Status } from './types';
 
 /** Everything the PDF page and the Word file show, already translated and formatted, so both exports always say the same thing. */
@@ -142,7 +143,7 @@ export function buildReport(e: Experiment, insights: Insights | null | undefined
       id: n.id,
       kind: n.kind,
       kindLabel: kindLabel(n.kind, t),
-      text: n.text,
+      text: toDisplay(n.text, n.mentions ?? []),
       date: dateText(n.created_at, language),
       time: timeText(n.created_at, language),
       timeLabel: n.time_label,

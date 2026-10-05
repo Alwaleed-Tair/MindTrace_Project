@@ -9,6 +9,8 @@ export function notificationText(n: NotificationItem, t: Strings): string {
   switch (n.kind) {
     case 'note_added':
       return fill(t.noteAddedBy, values);
+    case 'mentioned':
+      return fill(t.mentionedYou, values);
     case 'note_updated':
       return fill(t.noteUpdatedBy, values);
     case 'collaborator_added':
