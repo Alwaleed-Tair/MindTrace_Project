@@ -1,0 +1,199 @@
+@startuml
+!include _style.iuml
+title MindTrace - System Class Diagram
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+hide circle
+left to right direction
+
+package "Hardware Device (ESP32-S3)" {
+  class MindTraceDevice {
+    - screen : IDLE | REC | SUMMARY | DIAG | CALIB | MESSAGE
+    - linkState : NEVER | UP | SILENT | LOST | BYE
+    - recording : bool
+    - firmware : str = "2.0.0"
+    - sessionTag : uint16
+    + startSession()
+    + stopSession(reason)
+    + sendEvent(HELLO | HB | START | STOP)
+    + sendAudio(tag, seq, 512 samples)
+    + handlePcLine(line)
+  }
+  class Microphone <<INMP441, I2S 16 kHz>>
+  class Display <<ILI9341>>
+  class Button <<GPIO16>>
+}
+
+package "Laptop Application" {
+  class MindTraceApp {
+    - session : Session
+    + run()
+    + onEvent(name, fields)
+    + onAudio(payload)
+    + startSession(tag)
+    + saveNote(start, end)
+    + finishSession(reason)
+    + writeLiveStatus()
+  }
+  class DeviceLink {
+    + probePort()
+    + openSerial()
+    + send(line)
+  }
+  class Session {
+    - sessionId : str
+    - startedAt : datetime
+    - durationSec : float
+    - status : recording | complete
+    - notes : list
+    + addAudio(seq, samples)
+    + addNote(start, end)
+    + setTranscript(note, text)
+    + finish(reason)
+    + toJson() : session.json
+  }
+  class Segmenter {
+    - state : idle | speech
+    - noiseFloorDb : float
+    + process(samples) : SegEvent[]
+    + flush()
+  }
+  class Transcriber {
+    - engine : Audar | Whisper
+    + submit(job)
+    + transcribe(audio) : text
+  }
+  class SpeakerChecker {
+    - model : ONNX
+    + analyze(audio) : match score
+  }
+  class Bridge {
+    - platformUrl : str
+    - token : str
+    + setup(email, password)
+    + upload(sessionFolder)
+    + heartbeat(liveStatus)
+    + verify(sessionFolder)
+  }
+}
+
+package "Web Platform" {
+  class User {
+    - id : int
+    - publicId : MT-XXXXXXXX
+    - email : str
+    - name : str
+    - lab : str
+    - passwordHash : str
+    + register()
+    + login()
+    + resetPassword()
+  }
+  class ApiToken {
+    - tokenHash : str
+    - label : str
+    - lastSeenAt : datetime
+    - deviceStatus : json
+  }
+  class Experiment {
+    - id : int
+    - title : str
+    - summary : str
+    - status : Active | Paused | Completed
+    - durationSec : float
+    - originality : 0..100
+    - tags : list
+    - aiStatus : none | queued | running | done | failed
+    + addNote(text)
+    + addCollaborator(user)
+    + changeStatus(status)
+    + generateInsights()
+    + exportReport() : PDF | DOCX
+  }
+  class Note {
+    - id : int
+    - text : str
+    - source : manual | recording
+    - textSource : human | asr
+    - timeLabel : str
+    - audioFile : str
+    + edit(text)
+    + delete()
+    + mentions() : User[]
+  }
+  class RecordingSession {
+    - sessionId : str
+    - startedAt : str
+    - durationSec : float
+    - noteCount : int
+    - sessionJson : json
+    - audioFiles : list
+  }
+  class Team {
+    - id : int
+    - name : str
+    - inviteToken : str
+    + addMember(user, role)
+    + resetInvite()
+  }
+  class TeamMember {
+    - role : owner | supervisor | member
+    - joinedAt : datetime
+  }
+  class Notification {
+    - kind : mentioned | note_added | note_updated |\n collaborator_added | status_changed | team_added | team_joined
+    - message : str
+    - readAt : datetime
+  }
+  class AIInsights {
+    - summary : str
+    - keyPoints : list
+    - nextSteps : list
+    - noteSuggestions : list
+    - literature : papers + score
+    + translate(language)
+  }
+}
+
+package "External Services" {
+  class DeepSeekAPI <<external>>
+  class ScholarlyAPIs <<external>> {
+    OpenAlex, Semantic Scholar,
+    arXiv, Crossref
+  }
+}
+
+' device
+MindTraceDevice *-- "1" Microphone
+MindTraceDevice *-- "1" Display
+MindTraceDevice *-- "1" Button
+MindTraceDevice "1" -- "1" DeviceLink : USB serial >
+
+' laptop
+MindTraceApp *-- "1" DeviceLink
+MindTraceApp "1" o-- "0..1" Session : records >
+MindTraceApp *-- "1" Transcriber
+MindTraceApp *-- "0..1" SpeakerChecker
+Session *-- "1" Segmenter
+Bridge ..> Session : reads session.json
+Bridge "1" --> "1" ApiToken : authenticates with >
+Bridge ..> RecordingSession : uploads (HTTPS) >
+
+' platform
+User "1" -- "0..*" ApiToken
+User "1" -- "0..*" Experiment : owns >
+User "0..*" -- "0..*" Experiment : collaborates on >
+Experiment "1" *-- "0..*" Note
+User "1" -- "0..*" Note : writes >
+Note "0..*" ..> "0..*" User : @mentions >
+User "1" -- "0..*" RecordingSession : uploads >
+RecordingSession "0..*" --> "0..1" Experiment : creates / continues >
+Team "1" *-- "1..*" TeamMember
+User "1" -- "0..*" TeamMember
+Team "0..1" -- "0..*" Experiment : shared with >
+User "1" -- "0..*" Notification : receives >
+Notification "0..*" --> "0..1" Experiment
+Experiment "1" *-- "0..1" AIInsights
+AIInsights ..> DeepSeekAPI : analyze / translate
+AIInsights ..> ScholarlyAPIs : originality check
+@enduml
