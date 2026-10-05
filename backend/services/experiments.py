@@ -11,7 +11,7 @@ from core.db import Database
 from services.users import iso, now, public
 
 STATUSES = ("Active", "Paused", "Completed")
-NOTE_KINDS = ("observation", "decision")      # "hypothesis" was removed: older hypothesis notes became observations
+NOTE_KINDS = ("observation",)      # one kind only: a note. "hypothesis" and "decision" were removed; older ones became notes
 COLORS = ("mint", "lilac", "sand", "blue")
 MAX_NOTE_CHARS = 5000
 

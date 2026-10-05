@@ -187,7 +187,6 @@ export function ReportDocument({ m }: { m: ReportModel }) {
                         <span className="rp-dot" />
                         <div className="rp-note-card">
                           <div className="rp-note-meta">
-                            <span className="rp-kind">{n.kindLabel}</span>
                             <span dir="ltr">{n.timeLabel ?? n.time}</span>
                             {n.fromRecording && <span className="rp-badge"><AudioLines size={10} />{t.fromRecording}</span>}
                             {n.needsReview && <span className="rp-badge rp-badge-warn"><Eye size={10} />{t.needsReview}</span>}

@@ -1,7 +1,7 @@
 """AI insights for an experiment (DeepSeek): summary, documentation quality, originality estimate, note suggestions.
 
-The model only SUGGESTS. The one thing applied automatically is the kind label (observation / decision)
-of notes that came from a recording, and the originality number; the text of a note is never changed by the AI.
+The model only SUGGESTS. The one thing applied automatically is the originality number; the text of a note is never
+changed by the AI.
 """
 from __future__ import annotations
 
@@ -71,8 +71,6 @@ def run(db: Database, settings: Settings, exp_id: int, client: httpx.Client | No
     with db.tx() as c:
         c.execute("UPDATE experiments SET ai_status='done', ai_json=?, ai_error=NULL, ai_updated_at=?, originality=? WHERE id=?",
                   (json.dumps(result, ensure_ascii=False), iso(), originality, exp_id))
-        for k in result.get("note_kinds", []):                       # labels only, and only for notes that came from a recording
-            c.execute("UPDATE notes SET kind=? WHERE id=? AND experiment_id=? AND source='recording'", (k["kind"], k["note_id"], exp_id))
 
 
 def _literature(settings: Settings, data: dict, client: httpx.Client | None) -> dict:

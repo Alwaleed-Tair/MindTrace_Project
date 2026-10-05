@@ -4,10 +4,7 @@ import { usePreferences } from '@/context/PreferencesContext';
 import type { Dictation } from '@/hooks/useDictation';
 import { useAddNote } from '@/hooks/queries';
 import { ApiError } from '@/lib/api';
-import { kindColor } from '@/components/common/Trace';
-import type { NoteKind } from '@/lib/types';
 
-const KINDS: NoteKind[] = ['observation', 'decision'];
 
 export const NOTE_TEXTAREA_ID = 'new-note-text';
 
@@ -22,15 +19,13 @@ interface Props {
 export function AddNoteCard({ experimentId, text, onText, dictation }: Props) {
   const { t } = usePreferences();
   const [error, setError] = useState<string | null>(null);
-  const [kind, setKind] = useState<NoteKind>('observation');
-  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, decision: t.kindDecision };
   const add = useAddNote(experimentId);
   const save = () => {
     const value = text.trim();
     if (!value || add.isPending) return;
     setError(null);
-    add.mutate(kind === 'observation' ? value : { text: value, kind }, {
-      onSuccess: () => { onText(''); setKind('observation'); },
+    add.mutate(value, {
+      onSuccess: () => onText(''),
       onError: (e) => setError(e instanceof ApiError ? e.message : t.noteSaveFailed),
     });
   };
@@ -42,22 +37,6 @@ export function AddNoteCard({ experimentId, text, onText, dictation }: Props) {
         <PencilLine size={15} className="text-primary" />
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{t.addNoteSub}</p>
-      <div className="mt-3 flex gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-label={t.noteKind} data-testid="note-kind-picker">
-        {KINDS.map((k) => (
-          <button
-            type="button"
-            key={k}
-            role="radio"
-            aria-checked={kind === k}
-            onClick={() => setKind(k)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${kind === k ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-            data-testid={`note-kind-${k}`}
-          >
-            <span className="h-2 w-2 rounded-full" style={{ background: kindColor(k) }} />
-            {kindName[k]}
-          </button>
-        ))}
-      </div>
       <textarea
         id={NOTE_TEXTAREA_ID}
         value={text}

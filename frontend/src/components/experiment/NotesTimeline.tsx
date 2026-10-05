@@ -4,9 +4,8 @@ import { Avatar } from '@/components/common/Avatar';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useDeleteNote, useUpdateNote } from '@/hooks/queries';
 import { clockTime, fill } from '@/lib/format';
-import { kindLabel } from '@/lib/report';
 import { kindColor } from '@/components/common/Trace';
-import type { Note, NoteKind } from '@/lib/types';
+import type { Note } from '@/lib/types';
 
 function NoteAudio({ experimentId, noteId }: { experimentId: string; noteId: number }) {
   const [failed, setFailed] = useState(false);
@@ -71,11 +70,7 @@ const shouldReview = (n: Note) => !!n.asr?.needs_review && (n.asr.confidence ?? 
 
 export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignoredIds }: { experimentId: string; notes: Note[]; showAuthors: boolean; limit?: number; ignoredIds?: number[] }) {
   const { t, language } = usePreferences();
-  const [only, setOnly] = useState<NoteKind | 'all'>('all');
-  const filtered = only === 'all' ? notes : notes.filter((n) => n.kind === only);
-  const shown = limit ? filtered.slice(-limit) : filtered;
-  const kinds: (NoteKind | 'all')[] = ['all', 'observation', 'decision'];
-  const count = (k: NoteKind | 'all') => (k === 'all' ? notes.length : notes.filter((n) => n.kind === k).length);
+  const shown = limit ? notes.slice(-limit) : notes;
   return (
     <section className="surface p-5 sm:p-6" data-testid="card-notes">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -83,24 +78,6 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignored
           <h3 className="text-sm font-semibold">{t.timeline}</h3>
           <span className="font-mono text-[10px] text-muted-foreground" data-testid="notes-count">{fill(t.entries, { n: notes.length })}</span>
         </div>
-        {notes.length > 0 && (
-          <div className="flex flex-wrap gap-1.5" data-testid="kind-filter">
-            {kinds.map((k) => (
-              <button
-                type="button"
-                key={k}
-                aria-pressed={only === k}
-                onClick={() => setOnly(k)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${only === k ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:text-foreground'}`}
-                data-testid={`filter-kind-${k}`}
-              >
-                {k !== 'all' && <span className="h-1.5 w-1.5 rounded-full" style={{ background: kindColor(k) }} />}
-                {k === 'all' ? t.kindAll : kindLabel(k, t)}
-                <span className="font-mono opacity-70">{count(k)}</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
       <div>
         {shown.length ? (
@@ -113,7 +90,6 @@ export function NotesTimeline({ experimentId, notes, showAuthors, limit, ignored
               <div className="min-w-0 flex-1 pt-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-[10px] text-muted-foreground">{note.time_label ?? clockTime(note.created_at, language)}</span>
-                  <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ color: kindColor(note.kind), background: `hsl(var(--kind-${note.kind === 'decision' ? 'dec' : 'obs'}-soft))` }} data-kind={note.kind} data-testid={`note-kind-${note.id}`}>{kindLabel(note.kind, t)}</span>
                   {note.source === 'recording' && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><AudioLines size={10} />{t.fromRecording}</span>}
                   {shouldReview(note) && <span className="inline-flex items-center gap-1 rounded-full bg-kind-dec-soft px-2 py-0.5 text-[10px] font-semibold text-kind-dec" data-testid={`note-review-${note.id}`}><Eye size={10} />{t.needsReview}</span>}
                   {ignoredIds?.includes(note.id) && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground" data-testid={`note-ignored-${note.id}`}>{t.ignoredByAi}</span>}

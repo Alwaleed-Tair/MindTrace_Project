@@ -1,7 +1,7 @@
 export type Language = 'en' | 'ar';
 export type Theme = 'light' | 'dark';
 export type Status = 'Active' | 'Paused' | 'Completed';
-export type NoteKind = 'observation' | 'decision';
+export type NoteKind = 'observation';          // one kind only: a note (hypothesis and decision were removed)
 
 export interface Person {
   id: string; // public id, MT-XXXXXXXX

@@ -8,7 +8,7 @@ export interface TracePoint {
   label?: string;
 }
 
-export const KIND_VAR: Record<NoteKind, string> = { observation: '--kind-obs', decision: '--kind-dec' };
+export const KIND_VAR: Record<NoteKind, string> = { observation: '--kind-obs' };
 export const kindColor = (k: NoteKind) => `hsl(var(${KIND_VAR[k] ?? '--kind-obs'}))`;
 
 const toSeconds = (label: string) => label.split(':').reduce((a, x) => a * 60 + Number(x), 0);

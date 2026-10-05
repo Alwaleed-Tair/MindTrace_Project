@@ -50,7 +50,7 @@ def test_session_ingest_runs_deepseek_and_stores_suggestions_only(tmp_path):
     assert exp["originality"] == 33                                           # the model's novelty estimate
     assert first["text"] == sample()["notes"][1]["text"]                      # the AI never rewrites a note
     kinds = {n["id"]: n["kind"] for n in exp["notes"]}
-    assert kinds[1] == "decision" and kinds[2] == "observation"               # the model labelled note 1; a "hypothesis" label is ignored
+    assert set(kinds.values()) == {"observation"}                              # one kind only: the model's labels are ignored
     assert seen["auth"] == "Bearer sk-test-secret" and seen["url"] == "https://api.deepseek.com/chat/completions"
     assert seen["body"]["response_format"] == {"type": "json_object"}
     sent = json.dumps(seen["body"], ensure_ascii=False)

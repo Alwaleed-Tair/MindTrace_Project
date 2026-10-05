@@ -41,19 +41,17 @@ describe('report model', () => {
   });
 
   it('uses the scholarly score when there is one, and counts note types', () => {
-    const e = exp({ notes: [n(1), n(2, { kind: 'observation' }), n(3, { kind: 'decision' }), n(4, { kind: 'decision' })], collaborators: [lina] });
+    const e = exp({ notes: [n(1), n(2, { kind: 'observation' }), n(3), n(4)], collaborators: [lina] });
     const m = buildReport(e, analysed, 'en');
     expect(m.originality).toBe(71);
-    expect(m.kindCounts).toEqual({ observation: 2, decision: 2 });
+    expect(m.kindCounts).toEqual({ observation: 4 });
     expect(m.ai?.keyPoints).toEqual(['14% faster']);
-    expect(m.notes[2].kindLabel).toBe('Decision');
   });
 
   it('is translated to Arabic and gives a safe file name', () => {
-    const m = buildReport(exp({ code: 'EXP-5', title: 'اليوم بدأنا التجربة / الساعة 9.', status: 'Completed', notes: [n(1, { kind: 'decision' })] }), null, 'ar');
+    const m = buildReport(exp({ code: 'EXP-5', title: 'اليوم بدأنا التجربة / الساعة 9.', status: 'Completed', notes: [n(1)] }), null, 'ar');
     expect(m.dir).toBe('rtl');
     expect(m.statusLabel).toBe('مكتملة');
-    expect(m.notes[0].kindLabel).toBe('قرار');
     expect(m.fileName).toBe('MindTrace - EXP-5 - اليوم بدأنا التجربة الساعة 9');
   });
 });

@@ -10,6 +10,7 @@ interface Recognition {
   onend: (() => void) | null;
   start(): void;
   stop(): void;
+  abort?(): void;
 }
 type RecognitionCtor = new () => Recognition;
 
@@ -31,9 +32,34 @@ export function useDictation(lang: string, onText: (text: string) => void) {
   cb.current = onText;
   const supported = typeof window !== 'undefined' && !!getCtor();
 
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Stop listening. The browser normally ends with `onend` (after the last words); some browsers never send it, so after
+   *  1.5 s the session is ended here regardless: the Stop button always works. */
   const stop = useCallback(() => {
     want.current = false;
-    rec.current?.stop();
+    const r = rec.current;
+    if (!r) {                                        // between two auto-restarts: nothing is running
+      setListening(false);
+      setInterim('');
+      return;
+    }
+    try {
+      r.stop();
+    } catch {
+      /* already stopped */
+    }
+    if (stopTimer.current) clearTimeout(stopTimer.current);
+    stopTimer.current = setTimeout(() => {
+      if (rec.current !== r) return;
+      try {
+        r.abort?.();
+      } catch {
+        /* ignore */
+      }
+      rec.current = null;
+      setListening(false);
+      setInterim('');
+    }, 1500);
   }, []);
   const start = useCallback(() => {
     const Ctor = getCtor();
@@ -87,8 +113,13 @@ export function useDictation(lang: string, onText: (text: string) => void) {
     }
   }, [lang]);
 
-  useEffect(() => () => { want.current = false; rec.current?.stop(); }, []);
-  return { supported, listening, interim, error, start, stop, toggle: () => (rec.current ? stop() : start()) };
+  useEffect(() => () => {
+    want.current = false;
+    if (stopTimer.current) clearTimeout(stopTimer.current);
+    rec.current?.stop();
+  }, []);
+  // while listening (even between two auto-restarts) the button means Stop
+  return { supported, listening, interim, error, start, stop, toggle: () => (want.current || rec.current ? stop() : start()) };
 }
 
 export type Dictation = ReturnType<typeof useDictation>;

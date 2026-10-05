@@ -115,7 +115,7 @@ export async function buildDocx(m: ReportModel, logo: ArrayBuffer | null): Promi
 
   // ---- body
   const body: Child[] = [];
-  const statusColor = m.status === 'Paused' ? BRAND.kind.decision : m.status === 'Completed' ? '4A5A70' : BRAND.primary;
+  const statusColor = m.status === 'Paused' ? 'C27C0E' : m.status === 'Completed' ? '4A5A70' : BRAND.primary;
 
   // hero
   const hero: Child[] = [
@@ -203,7 +203,7 @@ export async function buildDocx(m: ReportModel, logo: ArrayBuffer | null): Promi
       body.push(para([run(n.date, { bold: true, size: 17, color: BRAND.muted })], { before: lastDate ? 200 : 40, after: 100, keepNext: true }));
       lastDate = n.date;
     }
-    const meta = [run(` ${n.kindLabel} `, { bold: true, size: 16, color: BRAND.kind[n.kind], shade: BRAND.kindSoft[n.kind] }), run(`   ${n.timeLabel ?? n.time}`, { size: 16, color: BRAND.muted })];
+    const meta = [run(`${n.timeLabel ?? n.time}`, { size: 16, color: BRAND.muted })];
     if (n.fromRecording) meta.push(run(`   ·   ${t.fromRecording}`, { size: 16, color: BRAND.muted }));
     if (n.needsReview) meta.push(run(`   ·   ${t.needsReview}`, { bold: true, size: 16, color: '9A6208' }));
     if (n.author) meta.push(run(`   ·   ${n.author}`, { bold: true, size: 16, color: BRAND.ink }));

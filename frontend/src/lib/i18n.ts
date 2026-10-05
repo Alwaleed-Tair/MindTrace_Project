@@ -274,7 +274,6 @@ const en = {
   reportGenerated: 'Generated with MindTrace',
   reportPage: 'Page {n} of {total}',
   kindObservation: 'Observation',
-  kindDecision: 'Decision',
   // account and editing
   forgotPassword: 'Forgot password?',
   forgotTitle: 'Reset your password',
@@ -384,7 +383,7 @@ const en = {
   sessionTraceSub: '{n} notes across {time}',
   traceHint: 'Each dot is a note at its moment. Click one to jump to it.',
   noteKind: 'Note type',
-  kindsCount: '{o} observations · {d} decisions',
+  notesN: '{n} notes',
   startedOn: 'Started {date}',
 } as const;
 
@@ -653,7 +652,6 @@ const ar: Strings = {
   reportGenerated: 'أُنشئ باستخدام MindTrace',
   reportPage: 'صفحة {n} من {total}',
   kindObservation: 'ملاحظة',
-  kindDecision: 'قرار',
   // account and editing
   forgotPassword: 'نسيت كلمة المرور؟',
   forgotTitle: 'استعادة كلمة المرور',
@@ -763,7 +761,7 @@ const ar: Strings = {
   sessionTraceSub: '{n} ملاحظات خلال {time}',
   traceHint: 'كل نقطة ملاحظة في لحظتها. اضغط عليها للانتقال لها.',
   noteKind: 'نوع الملاحظة',
-  kindsCount: '{o} ملاحظات · {d} قرارات',
+  notesN: '{n} ملاحظات',
   startedOn: 'بدأت {date}',
 };
 

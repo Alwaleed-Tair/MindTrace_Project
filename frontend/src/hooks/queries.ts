@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePreferences } from '@/context/PreferencesContext';
 import { api, ApiError } from '@/lib/api';
-import type { Experiment, Insights, Status, NoteKind } from '@/lib/types';
+import type { Experiment, Insights, Status } from '@/lib/types';
 
 /** Queries are per signed-in person (the cache is cleared on sign in/out), and never retry a 4xx. */
 const retry = (count: number, err: unknown) => !(err instanceof ApiError && err.status < 500 && err.status !== 0) && count < 1;
@@ -68,8 +68,7 @@ export function useSetStatus() {
 export function useAddNote(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    // a plain string is an observation; pass { text, kind } to file a decision
-    mutationFn: (v: string | { text: string; kind: NoteKind }) => (typeof v === 'string' || v.kind === 'observation' ? api.addNote(id, typeof v === 'string' ? v : v.text) : api.addNote(id, v.text, v.kind)),
+    mutationFn: (text: string) => api.addNote(id, text),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['experiment', id] });
       void qc.invalidateQueries({ queryKey: ['experiments'] });

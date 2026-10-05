@@ -9,9 +9,8 @@ import { StatusActions } from '@/components/dashboard/StatusActions';
 import { TraceLine, kindColor, tracePositions } from '@/components/common/Trace';
 import { usePreferences } from '@/context/PreferencesContext';
 import { fill, relativeTime } from '@/lib/format';
-import type { Experiment, NoteKind, Status } from '@/lib/types';
+import type { Experiment, Status } from '@/lib/types';
 
-const KINDS: NoteKind[] = ['observation', 'decision'];
 
 const stateClass: Record<Status, string> = {
   Active: '',
@@ -30,7 +29,6 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
   const points = marks.map((m, i) => ({ pos: pos[i], kind: m.kind }));
   const counts = e.kind_counts;
   const analyzed = e.ai_status === 'done';
-  const kindName: Record<NoteKind, string> = { observation: t.kindObservation, decision: t.kindDecision };
 
   return (
     <article className={`group surface p-5 transition duration-200 hover:border-primary/40 ${stateClass[e.status]}`} data-testid={`card-experiment-${e.id}`} data-status={e.status}>
@@ -48,13 +46,10 @@ export function ExperimentCard({ experiment, onSetStatus }: { experiment: Experi
         <div className="mt-4">
           <TraceLine points={points} testId={`trace-${e.id}`} />
           <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground" data-testid={`kinds-${e.id}`}>
-            {KINDS.map((k) => (
-              <span key={k} className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full" style={{ background: kindColor(k) }} />
-                <span className="font-mono font-semibold text-foreground">{counts?.[k] ?? 0}</span>
-                {kindName[k]}
-              </span>
-            ))}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: kindColor('observation') }} />
+              {fill(t.notesN, { n: counts?.observation ?? 0 })}
+            </span>
           </div>
         </div>
         <div className="mt-4 flex items-center gap-3 border-t border-border pt-4 text-[11px] text-muted-foreground">

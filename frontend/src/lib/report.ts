@@ -55,7 +55,7 @@ export interface ReportModel {
   fileName: string;
 }
 
-export const KIND_ORDER: NoteKind[] = ['observation', 'decision'];
+export const KIND_ORDER: NoteKind[] = ['observation'];
 
 /** Brand colors shared by both exports (hex, without the #, as Word wants them). */
 export const BRAND = {
@@ -65,8 +65,8 @@ export const BRAND = {
   muted: '5C6878',
   line: 'E2E7EE',
   panel: 'F5F7FA',
-  kind: { observation: '1F897F', decision: 'C27C0E' } as Record<NoteKind, string>,
-  kindSoft: { observation: 'E8F5F3', decision: 'FBF2E3' } as Record<NoteKind, string>,
+  kind: { observation: '1F897F' } as Record<NoteKind, string>,
+  kindSoft: { observation: 'E8F5F3' } as Record<NoteKind, string>,
 };
 
 const locale = (l: Language) => (l === 'ar' ? 'ar' : 'en');
@@ -80,7 +80,7 @@ function timeText(iso: string, language: Language) {
 }
 
 export function kindLabel(kind: NoteKind, t: Strings) {
-  return kind === 'decision' ? t.kindDecision : t.kindObservation;
+  return t.kindObservation;
 }
 
 function statusLabel(status: Status, t: Strings) {
@@ -99,7 +99,7 @@ function rtlSafe(s: string, language: Language) {
 export function buildReport(e: Experiment, insights: Insights | null | undefined, language: Language, now = new Date()): ReportModel {
   const t = translations[language];
   const notes = e.notes ?? [];
-  const kindCounts: Record<NoteKind, number> = { observation: 0, decision: 0 };
+  const kindCounts: Record<NoteKind, number> = { observation: 0 };
   notes.forEach((n) => (kindCounts[n.kind] = (kindCounts[n.kind] ?? 0) + 1));
 
   const r = insights?.result ?? null;

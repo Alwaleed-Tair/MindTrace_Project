@@ -169,7 +169,7 @@ function Detail({ experiment }: { experiment: Experiment }) {
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 id="trace-h" className="text-sm font-semibold">{t.sessionTrace}</h2>
-            <span className="text-xs text-muted-foreground" data-testid="trace-kinds">{fill(t.kindsCount, { o: count('observation'), d: count('decision') })}</span>
+            <span className="text-xs text-muted-foreground" data-testid="trace-kinds">{fill(t.notesN, { n: notes.length })}</span>
           </div>
           {notes.length > 0 && <span className="text-[11px] text-muted-foreground">{t.traceHint}</span>}
         </div>

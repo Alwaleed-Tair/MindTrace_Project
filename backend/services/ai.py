@@ -114,14 +114,11 @@ Return ONLY one JSON object, no other text, with exactly these keys:
     note's flags.alternative_text (a second speech-to-text reading) to propose the most likely intended text. Keep the
     researcher's wording and dialect; write English technical terms in Latin letters. Do not invent facts or numbers.
     If you cannot tell, leave the note out),
- "notes_to_review": [integer note ids a human should listen to],
- "note_kinds": [{"note_id": integer, "kind": "observation"|"decision"}]
-   (a label for every note: decision = a choice about what to do next; observation = everything else, including
-    measurements, remarks and guesses)
+ "notes_to_review": [integer note ids a human should listen to]
 }
 Write summary, key_points, next_steps, strengths, gaps, novelty_rationale and novelty_caveat in __LANG__. Never invent measurements that are not in the notes.
 Keep the rest short (at most 4 strengths and 4 gaps). Never put a double quote character inside a string value (use « » or single quotes instead) and do not use line breaks inside strings. Check that every { and [ is closed. The exact shape:
-{"ignored_note_ids": [], "summary": "...", "key_points": ["..."], "next_steps": ["..."], "documentation_score": 0, "strengths": ["..."], "gaps": ["..."], "novelty_score": 0, "novelty_rationale": "...", "novelty_caveat": "...", "note_suggestions": [], "notes_to_review": [], "note_kinds": [{"note_id": 1, "kind": "observation"}]}"""
+{"ignored_note_ids": [], "summary": "...", "key_points": ["..."], "next_steps": ["..."], "documentation_score": 0, "strengths": ["..."], "gaps": ["..."], "novelty_score": 0, "novelty_rationale": "...", "novelty_caveat": "...", "note_suggestions": [], "notes_to_review": []}"""
 
 
 def build_messages(session: dict, language: str) -> list[dict]:
@@ -187,7 +184,7 @@ def parse_result(content: str, valid_note_ids: set[int], note_texts: dict[int, s
         res.note_suggestions = [s for s in res.note_suggestions if _norm(s.suggested_text) != _norm(note_texts.get(s.note_id, ""))]
     res.ignored_note_ids = sorted({i for i in res.ignored_note_ids if i in valid_note_ids})
     res.notes_to_review = sorted({i for i in res.notes_to_review if i in valid_note_ids})
-    res.note_kinds = [k for k in res.note_kinds if k.note_id in valid_note_ids and k.kind in ("observation", "decision")]
+    res.note_kinds = []                                             # notes have one kind now: nothing to label
     return res.model_dump()
 
 
