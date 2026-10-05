@@ -180,3 +180,31 @@ export interface InvitePreview {
   owner: Person;
   already_member: boolean;
 }
+
+export interface BridgeComputer {
+  id: number;
+  label: string;
+  computer: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  online: boolean;
+  listener_running: boolean;
+  device_connected: boolean;
+  recording: boolean;
+  firmware: string | null;
+  levels: number[];
+}
+
+/** The link between the recording device and the platform (laptop app heartbeats). */
+export interface BridgeStatus {
+  linked: boolean;
+  online: boolean;
+  listener_running: boolean;
+  device_connected: boolean;
+  recording: boolean;
+  levels: number[];
+  firmware: string | null;
+  last_upload_at: string | null;
+  uploads: number;
+  computers: BridgeComputer[];
+}

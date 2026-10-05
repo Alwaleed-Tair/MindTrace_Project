@@ -19,7 +19,10 @@ function signedIn(experiments = [exp()]) {
   A.health.mockResolvedValue({ ok: true, version: 'x', ai_configured: false, dev_tools: false });
   A.insights.mockResolvedValue({ status: 'none', result: null, error: null, updated_at: null, ai_configured: false });
   A.listTeams.mockResolvedValue([]);
+  A.bridgeStatus.mockResolvedValue(bridge());
 }
+
+const bridge = (over: Record<string, unknown> = {}) => ({ linked: false, online: false, listener_running: false, device_connected: false, recording: false, levels: [], firmware: null, last_upload_at: null, uploads: 0, computers: [], ...over });
 
 beforeEach(() => {
   Object.values(A).forEach((f) => f.mockReset());
@@ -861,5 +864,42 @@ describe('teams', () => {
     await waitFor(() => expect(A.createExperiment).toHaveBeenCalledWith('Team study', '', '7'));
     fireEvent.change(await screen.findByTestId('select-experiment-team'), { target: { value: '' } });
     await waitFor(() => expect(A.shareWithTeam).toHaveBeenCalledWith('9', null));
+  });
+});
+
+
+describe('recording device card (the device-to-platform link is never silent)', () => {
+  const cases: [string, Record<string, unknown>, string, string][] = [
+    ['not linked', {}, 'off', 'Link your recording device'],
+    ['linked, laptop app off', { linked: true, last_upload_at: new Date(Date.now() - 3600_000).toISOString() }, 'off', 'Recording device offline'],
+    ['app on, listener off', { linked: true, online: true }, 'warn', 'Listening app is off'],
+    ['listener on, device unplugged', { linked: true, online: true, listener_running: true }, 'warn', 'Device not plugged in'],
+    ['device connected', { linked: true, online: true, listener_running: true, device_connected: true, levels: [-60, -40, -30], firmware: '2.0.0' }, 'live', 'Recording device connected'],
+    ['recording', { linked: true, online: true, listener_running: true, device_connected: true, recording: true, levels: [-30] }, 'rec', 'Recording now'],
+  ];
+  for (const [name, over, state, title] of cases) {
+    it(name, async () => {
+      signedIn();
+      A.bridgeStatus.mockResolvedValue(bridge(over));
+      renderApp();
+      const card = await screen.findByTestId('device-status');
+      expect(card).toHaveAttribute('data-state', state);
+      expect(screen.getByTestId('device-status-title')).toHaveTextContent(title);
+    });
+  }
+
+  it('shows the last upload time and live mic bars when connected', async () => {
+    signedIn();
+    A.bridgeStatus.mockResolvedValue(bridge({ linked: true, online: true, listener_running: true, device_connected: true, levels: [-50, -30], firmware: '2.0.0', last_upload_at: new Date(Date.now() - 12 * 60_000).toISOString() }));
+    renderApp();
+    expect(await screen.findByTestId('device-levels')).toBeInTheDocument();
+    expect(screen.getByTestId('device-last-upload')).toHaveTextContent(/Last upload .*12 minutes ago/);
+    expect(screen.getByTestId('device-last-upload')).toHaveTextContent('fw 2.0.0');
+  });
+
+  it('when not linked, the card leads to Settings', async () => {
+    signedIn();
+    renderApp();
+    expect(await screen.findByTestId('device-status-link')).toHaveAttribute('href', '/settings');
   });
 });

@@ -54,6 +54,8 @@
 | GET | `/api/experiments/{id}/insights?language=ar\|en` | حالة ونتيجة مراجعة DeepSeek. لو اللغة المطلوبة غير لغة التحليل وفي ترجمة محفوظة تُعاد مترجمة، وإلا `needs_translation: true` | نعم |
 | POST | `/api/experiments/{id}/insights/translate?language=` | ترجمة التحليل مرة وحدة (طلب قصير) وتُحفظ، وتبديل اللغة بعدها مجاني | نعم |
 | POST | `/api/experiments/{id}/insights` | تشغيل المراجعة (202). `503` لو ما في مفتاح | نعم |
+| POST | `/api/bridge/heartbeat` | برنامج اللابتوب يقول إنه شغّال وحالة الجهاز (موصول، يسجّل، مستوى المايك) كل 5 ثواني | token فقط |
+| GET | `/api/bridge/status` | حالة الربط للواجهة: مربوط؟ متصل؟ الجهاز موصول؟ يسجّل؟ آخر رفع | cookie |
 | **POST** | **`/api/sessions`** | **المدخل: `session.json` (+ الصوت) من برنامج اللابتوب** | token أو cookie |
 | GET | `/api/sessions`, `/api/sessions/{sessionId}` | الجلسات المرفوعة والـ JSON الأصلي بدون أي تغيير | نعم |
 | GET | `/api/sessions/{sessionId}/audio/{path}` | ملف صوت من جلستي | نعم |

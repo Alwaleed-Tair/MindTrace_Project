@@ -16,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from api import auth, experiments, misc, sessions, teams
+from api import auth, bridge, experiments, misc, sessions, teams
 from core.config import Settings
 from core.env import load_env
 from core.db import Database
@@ -67,7 +67,7 @@ def create_app(settings: Settings | None = None, ai_client: httpx.Client | None 
         return {"ok": ok_db, "version": API_VERSION, "ai_configured": st.ai_configured,
                 "dev_tools": st.dev_tools}
 
-    for r in (auth.router, experiments.router, misc.router, sessions.router, teams.router):
+    for r in (auth.router, bridge.router, experiments.router, misc.router, sessions.router, teams.router):
         app.include_router(r)
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)

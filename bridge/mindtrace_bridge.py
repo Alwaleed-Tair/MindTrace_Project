@@ -62,8 +62,9 @@ def save_state(state: dict, path: Path = STATE_FILE) -> None:
     tmp.replace(path)
 
 
-def load_saved_token(url: str, path: Path = TOKEN_FILE) -> str:
+def load_saved_token(url: str, path: Path | None = None) -> str:
     """The token saved by --setup, only if it was made for this platform address."""
+    path = path or TOKEN_FILE
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -71,8 +72,9 @@ def load_saved_token(url: str, path: Path = TOKEN_FILE) -> str:
     return d.get("token", "") if d.get("url", "").rstrip("/") == url.rstrip("/") else ""
 
 
-def setup_token(client: httpx.Client, base_url: str, email: str, password: str, path: Path = TOKEN_FILE) -> str:
+def setup_token(client: httpx.Client, base_url: str, email: str, password: str, path: Path | None = None) -> str:
     """Log in with email + password, ask the platform for a token, and save it for next time. The password is never stored."""
+    path = path or TOKEN_FILE
     base = base_url.rstrip("/")
     h = {"X-Requested-With": "mindtrace"}
     r = client.post(base + "/api/auth/login", json={"email": email, "password": password, "remember": True}, headers=h, timeout=20)
@@ -84,6 +86,44 @@ def setup_token(client: httpx.Client, base_url: str, email: str, password: str, 
     token = r.json()["token"]
     path.write_text(json.dumps({"url": base, "token": token}), encoding="utf-8")
     return token
+
+
+LIVE_FILE = ".live.json"          # written by the listener every couple of seconds (device connected, recording, levels)
+VERSION = "2.1"
+
+
+def whoami(client: httpx.Client, base_url: str, token: str) -> dict | None:
+    """The account this token uploads to, or None if the platform does not accept the token."""
+    r = client.get(base_url.rstrip("/") + "/api/auth/me", headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    if r.status_code == 401:
+        return None
+    r.raise_for_status()
+    return r.json()["user"]
+
+
+def read_live(sessions_dir: Path) -> dict | None:
+    """What the listener last reported, with its age in seconds. None when the listener never ran here."""
+    p = sessions_dir / LIVE_FILE
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        age = max(0.0, time.time() - float(d.get("updated_unix", 0)))
+    except (OSError, ValueError, TypeError):
+        return None
+    return {"running": bool(d.get("running")), "device_connected": bool(d.get("device_connected")),
+            "recording": bool(d.get("recording")), "firmware": d.get("firmware"), "mic": d.get("mic"),
+            "session_notes": int(d.get("session_notes") or 0), "levels": list(d.get("levels") or [])[-32:], "age_sec": round(age, 1)}
+
+
+def heartbeat(client: httpx.Client, base_url: str, token: str, sessions_dir: Path) -> bool:
+    """Tell the platform this laptop app is alive and what the device is doing. Never raises."""
+    import platform as _pf
+    body = {"bridge_version": VERSION, "computer": _pf.node()[:60], "sessions_dir_ok": sessions_dir.is_dir(),
+            "listener": read_live(sessions_dir)}
+    try:
+        r = client.post(base_url.rstrip("/") + "/api/bridge/heartbeat", json=body, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        return r.status_code == 200
+    except httpx.HTTPError:
+        return False
 
 
 def state_key(url: str, token: str) -> str:
@@ -176,9 +216,11 @@ def main(argv=None) -> int:
         except (httpx.HTTPError, RuntimeError) as exc:
             print(f"Setup failed: {exc}", file=sys.stderr)
             return 1
-        print(f"Done. Token saved in {TOKEN_FILE.name}. Now run:  python mindtrace_bridge.py --watch --sessions-dir <sessions folder>")
+        print(f"Done. This computer now uploads to {email}. Token saved in {TOKEN_FILE.name}.")
+        print("Now run:  python mindtrace_bridge.py --watch --sessions-dir <sessions folder>")
         return 0
-    token = os.environ.get("MINDTRACE_API_TOKEN", "") or load_saved_token(a.url)
+    # the token saved by --setup wins: an old MINDTRACE_API_TOKEN left in the window must not send recordings to another account
+    token = load_saved_token(a.url) or os.environ.get("MINDTRACE_API_TOKEN", "")
     sessions_dir = Path(a.sessions_dir)
     if not sessions_dir.is_dir():
         print(f"Sessions folder not found: {sessions_dir}  (use --sessions-dir)", file=sys.stderr)
@@ -198,15 +240,33 @@ def main(argv=None) -> int:
         if not token and not a.dry_run:
             print("No token yet. Run once:  python mindtrace_bridge.py --setup   (or set MINDTRACE_API_TOKEN).", file=sys.stderr)
             return 2
+        if token and not a.dry_run:
+            try:
+                me = whoami(client, a.url, token)
+            except (httpx.HTTPError, ValueError, KeyError):
+                me = {}
+            if me is None:
+                src = TOKEN_FILE.name if load_saved_token(a.url) else "MINDTRACE_API_TOKEN"
+                print(f"The platform does not accept this token (from {src}): it belongs to another server or a deleted "
+                      f"account/database.\nFix: run  python mindtrace_bridge.py --setup", file=sys.stderr)
+                return 2
+            if me:
+                print(f"Uploading to the account: {me.get('name')} <{me.get('email')}>   "
+                      f"(not yours? run  python mindtrace_bridge.py --setup)")
+        next_scan = 0.0
         while True:
-            sent, failed = run_once(client, a.url, sessions_dir, state, with_full, token, a.dry_run)
-            if sent:
-                save_state(all_state)
-            if not a.watch:
-                if not (sent or failed):
-                    print("Nothing new to upload.")
-                return 1 if failed else 0
-            time.sleep(a.interval)
+            if time.monotonic() >= next_scan:
+                sent, failed = run_once(client, a.url, sessions_dir, state, with_full, token, a.dry_run)
+                if sent:
+                    save_state(all_state)
+                if not a.watch:
+                    if not (sent or failed):
+                        print("Nothing new to upload.")
+                    return 1 if failed else 0
+                next_scan = time.monotonic() + a.interval
+            if token and not a.dry_run:
+                heartbeat(client, a.url, token, sessions_dir)       # the web app shows "recording device connected"
+            time.sleep(min(5.0, a.interval))
 
 
 if __name__ == "__main__":

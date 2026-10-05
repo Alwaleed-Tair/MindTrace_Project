@@ -1,4 +1,4 @@
-import type { Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, Team, TeamDetail, InvitePreview } from './types';
+import type { BridgeStatus, Experiment, Health, Insights, Note, NoteKind, NotificationItem, Person, Stats, Status, Team, TeamDetail, InvitePreview } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -54,6 +54,7 @@ const del = <T = void>(p: string) => request<T>('DELETE', p);
 
 export const api = {
   health: () => get<Health>('/health'),
+  bridgeStatus: () => get<BridgeStatus>('/bridge/status'),
   me: () => get<{ user: Person }>('/auth/me'),
   login: (email: string, password: string, remember: boolean) => post<{ user: Person }>('/auth/login', { email, password, remember }),
   register: (name: string, email: string, password: string, lab: string) => post<{ user: Person }>('/auth/register', { name, email, password, lab }),

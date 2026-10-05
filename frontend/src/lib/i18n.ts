@@ -1,6 +1,19 @@
 import type { Language } from './types';
 
 const en = {
+  devConnected: 'Recording device connected',
+  devRecording: 'Recording now',
+  devUnplugged: 'Device not plugged in',
+  devUnpluggedSub: 'The laptop app is on. Plug the device into the USB port.',
+  devListenerOff: 'Listening app is off',
+  devListenerOffSub: 'Start it on the laptop: python pc\\mindtrace_listener.py',
+  devOffline: 'Recording device offline',
+  devOfflineSub: 'Start the laptop app (bridge) to connect it.',
+  devNotLinked: 'Link your recording device',
+  devNotLinkedSub: 'Run the laptop app once with --setup to link it to this account.',
+  devLastUpload: 'Last upload {time}',
+  devNoUpload: 'No uploads yet',
+  devNotesInSession: '{n} notes in this session',
   ignoredByAi: 'Not used in the analysis (unrelated)',
   ignoredCount: '{n} unrelated note(s) were left out of the analysis.',
   editNote: 'Edit',
@@ -378,6 +391,19 @@ const en = {
 export type Strings = { [K in keyof typeof en]: string };
 
 const ar: Strings = {
+  devConnected: 'جهاز التسجيل متصل',
+  devRecording: 'يسجّل الآن',
+  devUnplugged: 'الجهاز غير موصول',
+  devUnpluggedSub: 'برنامج اللابتوب شغّال. وصّل الجهاز بمنفذ USB.',
+  devListenerOff: 'برنامج الاستماع متوقف',
+  devListenerOffSub: 'شغّله على اللابتوب: python pc\\mindtrace_listener.py',
+  devOffline: 'جهاز التسجيل غير متصل',
+  devOfflineSub: 'شغّل برنامج اللابتوب (الجسر) عشان يتصل.',
+  devNotLinked: 'اربط جهاز التسجيل',
+  devNotLinkedSub: 'شغّل برنامج اللابتوب مرة وحدة بـ --setup لربطه بهذا الحساب.',
+  devLastUpload: 'آخر رفع {time}',
+  devNoUpload: 'ما فيه رفع للحين',
+  devNotesInSession: '{n} ملاحظات في هذه الجلسة',
   ignoredByAi: 'لم تُستخدم في التحليل (لا علاقة لها)',
   ignoredCount: 'تم استبعاد {n} ملاحظة لا علاقة لها بالتجربة من التحليل.',
   editNote: 'تعديل',

@@ -134,6 +134,8 @@ CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 # columns added after the first release: (table, column, definition). Applied once to older database files.
 MIGRATIONS = [
     ("experiments", "team_id", "INTEGER REFERENCES teams(id) ON DELETE SET NULL"),
+    ("api_tokens", "last_seen_at", "TEXT"),          # last heartbeat from the laptop app using this token
+    ("api_tokens", "status_json", "TEXT"),           # what the laptop app last reported (device connected, recording, levels)
 ]
 
 

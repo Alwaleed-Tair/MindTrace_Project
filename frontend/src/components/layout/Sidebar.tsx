@@ -1,6 +1,7 @@
 import { LayoutDashboard, MessageSquareHeart, Settings, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { DeviceStatusCard } from '@/components/layout/DeviceStatusCard';
 import { FeedbackDialog } from '@/components/layout/FeedbackDialog';
 import { Logo } from '@/components/common/Logo';
 import { useAuth } from '@/context/AuthContext';
@@ -71,6 +72,7 @@ export function Sidebar() {
           </div>
         )}
         <div className="mt-auto w-[218px] space-y-1">
+          <div className="mb-3"><DeviceStatusCard /></div>
           <Link href="/settings" onClick={closeMobileNav} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${location === '/settings' ? 'bg-sidebar-active font-semibold text-white' : 'text-sidebar-foreground/80 hover:bg-sidebar-active hover:text-white'}`} data-testid="link-nav-settings">
             <Settings size={16} />
             <span>{t.settings}</span>

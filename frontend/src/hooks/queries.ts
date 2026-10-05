@@ -197,3 +197,8 @@ export const useShareWithTeam = (experimentId: string) => useTeamMutation((teamI
 export function useInvite(token: string) {
   return useQuery({ queryKey: ['invite', token], queryFn: () => api.previewInvite(token), retry: false });
 }
+
+/** Is the recording device linked and live? Polled so the sidebar card follows the laptop app. */
+export function useBridgeStatus(enabled = true) {
+  return useQuery({ queryKey: ['bridge-status'], queryFn: api.bridgeStatus, enabled, retry, refetchInterval: 5000, refetchIntervalInBackground: false });
+}

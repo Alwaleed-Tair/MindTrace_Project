@@ -260,7 +260,8 @@ def test_recorder_session_arrives_through_the_bridge_and_shows_up(make_page, ser
     expect(p.pg.locator("audio")).to_have_count(1)                                            # a player only for the note that has audio
     wrong = subprocess.run([sys.executable, str(ROOT / "bridge" / "mindtrace_bridge.py"), "--url", server.url, "--sessions-dir", str(tmp_path / "sessions")],
                            env={**os.environ, "MINDTRACE_API_TOKEN": "mt_wrong"}, capture_output=True, text=True, cwd=tmp_path)
-    assert "nothing" in wrong.stdout.lower() or "401" in wrong.stdout or wrong.returncode == 0   # unchanged sessions are skipped before any auth is needed
+    assert wrong.returncode == 2 and "does not accept this token" in wrong.stderr and "--setup" in wrong.stderr   # a bad token is never silent
+    assert "Uploading to the account: Alice A <a@lab.com>" in r.stdout                        # the bridge says WHERE the recordings go
 
 
 @pytest.mark.skipif(not os.environ.get("DEEPSEEK_API_KEY"), reason="set DEEPSEEK_API_KEY to call the real DeepSeek API")
